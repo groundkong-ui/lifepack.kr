@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>모두의 준비물 — 로그인 처리 중</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: #FFFFFF;
+      color: #1F1B16;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      text-align: center;
+      padding: 24px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #EBE5DB;
+      border-top-color: #1D9E75;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { font-size: 15px; color: #6B645B; margin: 0; }
+    a.btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 12px 28px;
+      border-radius: 999px;
+      background: #414141;
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner" aria-hidden="true"></div>
+  <p>로그인 처리 중이에요…<br />앱으로 자동으로 돌아갑니다.</p>
+  <a id="open" class="btn" href="lifepack://auth-callback">앱으로 돌아가기</a>
+  <script>
+    // Supabase OAuth 콜백 폴백 페이지 (2026-07-17, docs/20 §14)
+    // 역할: URL 해시(#access_token=...)를 앱 커스텀 스킴으로 그대로 재전달.
+    // 토큰은 해시(fragment)라 서버로 전송되지 않고 브라우저 안에서만 이동합니다.
+    (function () {
+      var payload = location.hash || location.search || '';
+      var target = 'lifepack://auth-callback' + payload;
+      document.getElementById('open').setAttribute('href', target);
+      location.replace(target);
+    })();
+  </script>
+</body>
+</html>
