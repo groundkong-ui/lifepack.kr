@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "kr.lifepack.app",
       "sha256_cert_fingerprints": [
-        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C",
+        "C4:1F:84:1F:FF:44:F1:4F:AD:15:95:0A:2F:68:EB:51:40:2C:24:21:E7:70:A8:5D:B7:70:17:0B:3D:E4:41:24"
       ]
     }
   }
