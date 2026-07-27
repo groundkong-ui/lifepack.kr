@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["8HMXZCN8SS.kr.lifepack.app"],
+        "components": [
+          { "/": "/invite/*" },
+          { "/": "/auth-callback" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["8HMXZCN8SS.kr.lifepack.app"]
+  }
+}
