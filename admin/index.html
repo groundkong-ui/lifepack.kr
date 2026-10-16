@@ -173,6 +173,12 @@
     .secHead b { font-size: 14px; }
     .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 60; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
     .lightbox img { max-width: 96vw; max-height: 96vh; object-fit: contain; }
+    /* 2026-10-16 문지영: 크게 보기 아래 정보 줄 (구역 · 제목 · 장소 · 작가 · 촬영시기 · 수상 · 공공누리) */
+    .lightbox.withInfo { flex-direction: column; gap: 10px; }
+    .lightbox.withInfo img { max-height: calc(96vh - 48px); }
+    .lightbox .info { color: #fff; font-size: 13px; line-height: 1.5; text-align: center; max-width: 96vw; padding: 0 16px; opacity: .92; }
+    .lightbox .info b { font-weight: 600; }
+    .tile .tt { font-weight: 600; color: var(--ink); }
 
     /* ── 토스트 ───────────────────────────── */
     #toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 70; }
@@ -373,8 +379,12 @@ function alertDialog(message, title) {
     m.foot.append(el('button', { class: 'btn primary', onClick: () => { m.back.remove(); resolve(); } }, '확인'));
   });
 }
-function openLightbox(url) {
-  const lb = el('div', { class: 'lightbox', onClick: () => lb.remove() }, el('img', { src: url, alt: '' }));
+function openLightbox(url, info) {
+  // info: 문자열 배열 — 있으면 사진 아래 한 줄로 ' · ' 연결 (2026-10-16 문지영: 사진 검색 크게 보기 정보 줄)
+  const parts = (info || []).filter(Boolean);
+  const lb = el('div', { class: 'lightbox' + (parts.length ? ' withInfo' : ''), onClick: () => lb.remove() },
+    el('img', { src: url, alt: '' }),
+    parts.length ? el('div', { class: 'info' }, ...parts.flatMap((p, i) => [i ? ' · ' : null, i === 1 ? el('b', {}, p) : p])) : null);
   document.body.append(lb);
 }
 
@@ -1289,11 +1299,15 @@ function renderEditor(postId, initial) {
             const key = photoKey(item.origin, item.originId);
             const added = existing.has(key);
             const order = picked.findIndex(p => photoKey(p.origin, p.originId) === key) + 1;
-            const pic = el('div', { class: 'pic' + (order ? ' on' : ''), onClick: () => openLightbox(item.imageUrl) }, el('img', { src: item.thumbUrl, alt: '', loading: 'lazy' }));
+            // 크게 보기 정보 줄: 구역 · 제목(굵게) · 장소 · 작가 · 촬영시기 · 수상내역 · 공공누리 (2026-10-16 문지영)
+            const info = [PHOTO_ORIGIN_LABEL[item.origin], item.title || '(제목 없음)', item.location, item.photographer, item.shotAt, item.award, item.license ? licenseLabel(item.license) : null];
+            const pic = el('div', { class: 'pic' + (order ? ' on' : ''), onClick: () => openLightbox(item.imageUrl, info) }, el('img', { src: item.thumbUrl, alt: '', loading: 'lazy' }));
             if (added) pic.append(el('div', { class: 'added' }, '추가됨'));
             else pic.append(el('div', { class: 'pick' + (order ? ' on' : ''), onClick: e => { e.stopPropagation(); toggle(item); } }, order ? String(order) : ''));
             grid.append(el('div', { class: 'tile' + (added ? ' dim' : '') }, pic,
-              el('span', { class: 'ellip' }, item.location || item.title),
+              // 2026-10-16 문지영: 제목(굵게) 먼저 — "어떤 축제 사진인지" 보이게. 그 아래 장소 · 작가 (구: 장소 없으면 제목 한 줄)
+              el('span', { class: 'ellip tt', title: item.title || '' }, item.title || '(제목 없음)'),
+              item.location ? el('span', { class: 'ellip', title: item.location }, item.location) : null,
               item.photographer ? el('span', { class: 'ellip' }, item.photographer) : null,
               item.license ? el('span', { class: 'caption' }, licenseLabel(item.license)) : null,
               widths[key] !== undefined ? el('span', { class: 'caption' }, '폭 ' + widths[key] + 'px') : null));
