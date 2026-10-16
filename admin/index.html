@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>모두의 준비물 — 포스트 관리</title>
+  <!--
+    모두의 준비물 Staff 대시보드 (2026-10-16 신설)
+    · 단일 HTML, 빌드 없음. 라이브러리 = supabase-js(CDN)만.
+    · 앱 관리자 화면(src/components/admin/PostForm.tsx · TourApiPicker.tsx · PhotoSearchSheet.tsx,
+      src/api/admin-posts.ts · locations.ts · photoSearch.ts)과 1:1 동일 저장 규칙.
+      - 장소 = 10-08 D안 (연결 + 한줄 설명만, TourAPI 값 덮어쓰기 없음)      docs/25 §9
+      - 이미지 = 출처 칩·공공누리 유형·credit 자동 생성, 저장 후 Storage 정리  docs/18 §7·§7-A·§9
+      - 본문 마크업 = ## · ** · __ · =y= =b= =r= =g=                           docs/19
+    · 보안: Supabase URL·anon 키는 설정 화면에서 운영자가 직접 입력 → 이 브라우저(localStorage)에만 저장.
+      service_role 키 입력 칸 없음. 로그인 = 카카오(앱과 동일 Supabase OAuth, implicit).
+      외부 문자열(TourAPI·사진 API·본문)은 textContent로만 그림 (innerHTML 금지).
+    · 배포: lifepack.kr 웹 repo → /admin/index.html. Supabase Redirect URLs에 https://lifepack.kr/admin/ 등록.
+  -->
+  <style>
+    @font-face { font-family: 'Pretendard'; font-weight: 400; font-display: swap;
+      src: url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-Regular.woff2') format('woff2'); }
+    @font-face { font-family: 'Pretendard'; font-weight: 500; font-display: swap;
+      src: url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-Medium.woff2') format('woff2'); }
+    @font-face { font-family: 'Pretendard'; font-weight: 600; font-display: swap;
+      src: url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-SemiBold.woff2') format('woff2'); }
+    @font-face { font-family: 'Pretendard'; font-weight: 700; font-display: swap;
+      src: url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-Bold.woff2') format('woff2'); }
+
+    :root {
+      --bg: #FFFFFF; --surface: #FFFFFF; --ink: #1F1B16; --ink-soft: #6B645B; --ink-faint: #A89F92;
+      --line: #EBE5DB; --brand: #60A4CE; --brand-soft: #E8F1F8; --warn: #E74C3C; --kakao: #FEE500;
+      --cta: #414141; --low: #F5F5F5; --band: #F1F3F4; --border: #E0E3E7;
+      --purple: #907CFF; --green: #8DC970;
+      --side-w: 220px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { background: var(--bg); color: var(--ink); font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+    button, input, textarea, select { font-family: inherit; font-size: 14px; color: var(--ink); }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    a { color: var(--brand); }
+    .hidden { display: none !important; }
+    .muted { color: var(--ink-soft); }
+    .caption { color: var(--ink-faint); font-size: 12px; }
+    .warnText { color: var(--warn); }
+
+    /* ── 공통 입력 ─────────────────────────── */
+    .input { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 0 14px; background: var(--surface); outline: none; }
+    .input:focus, textarea.input:focus { border-color: var(--cta); }
+    textarea.input { height: auto; padding: 12px 14px; resize: vertical; line-height: 1.6; }
+    .label { font-weight: 600; font-size: 12px; color: var(--ink-soft); letter-spacing: .2px; display: flex; justify-content: space-between; align-items: center; }
+    .helper { font-size: 11px; color: var(--ink-faint); }
+    .field { display: flex; flex-direction: column; gap: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+    .chip.on { background: var(--cta); border-color: var(--cta); color: #fff; }
+    .chip.sm { height: 26px; padding: 0 9px; font-size: 11px; }
+    .btn { height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--cta); background: var(--surface); color: var(--cta); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn.primary { background: var(--cta); color: #fff; }
+    .btn.pill { border-radius: 999px; }
+    .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
+    .btn.ghost { border-color: transparent; }
+    .btn.danger { border-color: transparent; color: var(--warn); }
+    .btn.kakao { background: var(--kakao); border-color: var(--kakao); color: #191919; height: 52px; font-size: 15px; width: 100%; max-width: 360px; }
+    .iconBtn { width: 28px; height: 28px; border: 0; background: transparent; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: var(--ink); }
+    .iconBtn:hover { background: var(--low); }
+    .iconBtn.del { color: var(--warn); }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── 레이아웃 ─────────────────────────── */
+    #app { display: flex; min-height: 100vh; }
+    aside.side { width: var(--side-w); flex: 0 0 var(--side-w); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 12px; gap: 6px; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 8px; padding: 6px 8px 16px; font-weight: 600; font-size: 16px; }
+    .brand .logo { width: 24px; height: 24px; border-radius: 6px; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+    .brand .logo i { display: block; }
+    .menu { display: flex; flex-direction: column; gap: 2px; }
+    .menu button { text-align: left; height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: transparent; font-size: 14px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+    .menu button.on { background: var(--brand-soft); color: var(--ink); font-weight: 600; }
+    .menu button:hover:not(.on) { background: var(--low); }
+    .menu .sub { font-size: 11px; color: var(--ink-faint); padding: 14px 12px 4px; }
+    .sideFoot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+    .sideFoot .who { display: flex; align-items: center; gap: 8px; }
+    .sideFoot .who img, .sideFoot .who .av { width: 28px; height: 28px; border-radius: 50%; background: var(--low); object-fit: cover; }
+    main.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .topbar { height: 52px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 20px; gap: 12px; position: sticky; top: 0; background: var(--surface); z-index: 5; }
+    .topbar h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar .hamb { display: none; }
+    .content { padding: 20px; flex: 1; }
+
+    /* ── 로그인·설정·차단 ─────────────────── */
+    .center { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .panel { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+    .panel h2 { margin: 0; font-size: 20px; font-weight: 600; }
+    .panel p { margin: 0; color: var(--ink-soft); font-size: 14px; }
+    .keyRow { display: flex; gap: 6px; }
+    .keyRow .input { flex: 1; }
+
+    /* ── 목록 ─────────────────────────────── */
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .toolbar .input { width: 240px; }
+    .toolbar select.input { width: 130px; }
+    table.list { width: 100%; border-collapse: collapse; }
+    table.list th { text-align: left; font-size: 12px; color: var(--ink-faint); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    table.list td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    table.list tr.rowBtn { cursor: pointer; }
+    table.list tr.rowBtn:hover td { background: var(--low); }
+    .thumb { width: 56px; height: 40px; border-radius: 6px; background: var(--band); object-fit: contain; display: block; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--low); font-size: 11px; font-weight: 500; }
+    .tdTitle { font-weight: 600; }
+    .empty { padding: 60px 0; text-align: center; color: var(--ink-faint); }
+
+    /* ── 편집 + 미리보기 ───────────────────── */
+    .editorWrap { display: flex; gap: 20px; align-items: flex-start; }
+    .form { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; max-width: 760px; }
+    .previewCol { width: 395px; flex: 0 0 395px; position: sticky; top: 72px; }
+    .previewCol.collapsed { width: 44px; flex-basis: 44px; }
+    .previewCol.collapsed .phone { display: none; }
+    .previewHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: var(--ink-soft); }
+    .phone { width: 375px; height: calc(100vh - 130px); min-height: 520px; border: 1px solid var(--line); border-radius: 24px; overflow: hidden; background: #fff; box-shadow: 0 1px 2px rgba(31,27,22,.04), 0 8px 24px rgba(31,27,22,.06); }
+    .phone .screen { height: 100%; overflow-y: auto; }
+    .viewTabs { display: none; gap: 6px; margin-bottom: 12px; }
+    .viewTabs button { flex: 1; }
+
+    .mdToolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mdBtn { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 500; }
+    .mdBtn.hl { width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .mdBtn.hl i { width: 14px; height: 14px; border-radius: 50%; display: block; }
+    textarea.body { min-height: 320px; font-size: 15px; }
+
+    .imgCard .thumbWrap { width: 56px; height: 56px; border-radius: 6px; background: var(--band); display: flex; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 56px; }
+    .imgCard .thumbWrap img { max-width: 100%; max-height: 100%; }
+    .idx { width: 18px; font-size: 11px; color: var(--ink-faint); text-align: center; }
+    .grow { flex: 1; min-width: 0; }
+    .ellip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .small { font-size: 12px; }
+    .srcInput { height: 36px; font-size: 12px; }
+    .dropZone { border: 1px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center; color: var(--ink-faint); font-size: 12px; }
+    .dropZone.over { border-color: var(--cta); color: var(--ink); background: var(--low); }
+
+    /* ── 모달 ─────────────────────────────── */
+    .modalBack { position: fixed; inset: 0; background: rgba(31,27,22,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+    .modal { width: 100%; max-width: 960px; max-height: 92vh; background: var(--surface); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
+    .modal.sm { max-width: 420px; }
+    .modalHead { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--line); font-weight: 600; }
+    .modalBody { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .modalFoot { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 12px; align-items: center; }
+    .modalFoot .count { color: var(--ink-soft); font-size: 13px; }
+    .modalFoot .count b { color: var(--cta); }
+    .modalFoot .btn { flex: 1; }
+    .stepper { height: 40px; border: 1px solid var(--line); border-radius: 8px; display: flex; align-items: center; }
+    .stepper button { width: 40px; height: 38px; border: 0; background: transparent; font-size: 16px; }
+    .stepper span { flex: 1; text-align: center; font-weight: 600; }
+    .resultCard { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px; cursor: pointer; }
+    .resultCard.on { border-color: var(--cta); background: var(--low); }
+    .resultCard img, .resultCard .noimg { width: 64px; height: 64px; border-radius: 8px; background: var(--low); object-fit: cover; flex: 0 0 64px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ink-faint); }
+    .checkbox { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; flex: 0 0 24px; }
+    .checkbox.on { background: var(--cta); border-color: var(--cta); }
+    .outline { border: 1px solid var(--line); background: var(--surface); }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .tile { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-soft); }
+    .tile .pic { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--band); cursor: zoom-in; border: 2px solid transparent; }
+    .tile .pic.on { border-color: var(--cta); }
+    .tile .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tile .pick { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.25); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .tile .pick.on { background: var(--cta); border-color: var(--cta); }
+    .tile.dim .pic { opacity: .45; }
+    .tile .added { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; background: rgba(0,0,0,.35); }
+    .secHead { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+    .secHead b { font-size: 14px; }
+    .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 60; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+    .lightbox img { max-width: 96vw; max-height: 96vh; object-fit: contain; }
+
+    /* ── 토스트 ───────────────────────────── */
+    #toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 70; }
+    .toast { background: #333; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-width: 90vw; }
+    .toast.err { background: var(--warn); }
+    .spin { width: 16px; height: 16px; border: 2px solid rgba(0,0,0,.15); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 미리보기(앱 상세 재현) ───────────── */
+    .pv { font-family: 'Pretendard', system-ui, sans-serif; color: #1F1B16; background: #fff; padding-bottom: 40px; }
+    .pv .hdr { height: 52px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #343434; border-bottom: 1px solid #F1F3F4; }
+    .pv .ptb { padding: 10px 16px 8px; text-align: center; }
+    .pv .ptb .sub { font-size: 11px; font-weight: 600; color: #60A4CE; letter-spacing: .4px; margin-bottom: 6px; }
+    .pv .ptb .title { font-size: 24px; font-weight: 600; line-height: 32px; letter-spacing: -.6px; }
+    .pv .pab { display: flex; align-items: center; gap: 10px; padding: 8px 16px; }
+    .pv .pab .av { width: 36px; height: 36px; border-radius: 50%; background: #E8F1F8; color: #60A4CE; display: flex; align-items: center; justify-content: center; font-weight: 700; object-fit: cover; }
+    .pv .pab .nm { font-size: 14px; font-weight: 600; }
+    .pv .pab .nm span { font-size: 11px; color: #60A4CE; margin-left: 6px; }
+    .pv .pab .mt { font-size: 11px; color: #A89F92; }
+    .pv .pst { padding: 18px 16px 10px; font-size: 17px; line-height: 25px; color: #4A4A4A; letter-spacing: -.2px; white-space: pre-wrap; }
+    .pv .slider { position: relative; background: #F1F3F4; height: 250px; overflow: hidden; }
+    .pv .slider img { width: 100%; height: 100%; display: block; }
+    .pv .slider img.cover { object-fit: cover; }
+    .pv .slider img.contain { object-fit: contain; }
+    .pv .slider .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); font-size: 16px; }
+    .pv .slider .nav.l { left: 8px; } .pv .slider .nav.r { right: 8px; }
+    .pv .slider .badge { position: absolute; right: 12px; bottom: 10px; background: rgba(0,0,0,.45); color: #fff; font-size: 12px; letter-spacing: 1px; padding: 2px 8px; border-radius: 999px; }
+    .pv .slider .fallback { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 72px; font-weight: 800; color: #60A4CE; opacity: .2; }
+    .pv .credit { background: #F1F3F4; text-align: center; font-size: 12px; color: #A89F92; padding: 5px 16px 2px; }
+    .pv .credit.last { border-radius: 0 0 20px 20px; padding-bottom: 8px; }
+    .pv .band { background: #F1F3F4; border-radius: 0 0 10px 10px; padding: 6px 16px 10px; display: flex; align-items: center; gap: 8px; }
+    .pv .band .lbl { font-size: 12px; color: #6B645B; white-space: nowrap; }
+    .pv .band .dots { display: flex; gap: 3px; flex: 1; justify-content: flex-end; }
+    .pv .band .dots i { width: 20px; height: 20px; border-radius: 50%; background: #E0E3E7; color: #8A8A8A; font-size: 10px; display: flex; align-items: center; justify-content: center; font-style: normal; }
+    .pv .band .dots i.best { background: #8DC970; color: #fff; font-weight: 600; }
+    .pv .pc { padding: 24px 20px 10px; }
+    .pv .pc p { margin: 0; font-size: 17px; line-height: 25px; color: #4A4A4A; letter-spacing: -.2px; word-break: keep-all; }
+    .pv .pc .gap { height: 16px; }
+    .pv .pc h2 { margin: 14px 0 6px; font-size: 19px; line-height: 24px; color: #4A4A4A; letter-spacing: -.6px; font-weight: 700; }
+    .pv .pc b { font-weight: 600; }
+    .pv .pc u { font-weight: 500; }
+    .pv .pc mark { color: #1F1B16; font-weight: 500; padding: 0; }
+    .pv .pc mark.y { background: #FEF8DB; } .pv .pc mark.b { background: #E5F1F8; } .pv .pc mark.r { background: #FFEEEB; } .pv .pc mark.g { background: #ECF6E5; }
+    .pv .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px 24px; }
+    .pv .tags span { padding: 5px 10px 5px 12px; border: 1px solid #E0E3E7; border-radius: 999px; font-size: 13px; color: #7E7E7E; }
+    .pv .prc { background: #F1F3F4; padding: 30px 16px 18px; }
+    .pv .prc .t { font-size: 18px; font-weight: 600; color: #343434; letter-spacing: -.3px; margin-bottom: 10px; display: flex; gap: 6px; align-items: center; }
+    .pv .prc .sorts { display: flex; gap: 6px; margin-bottom: 4px; }
+    .pv .prc .sorts span { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; color: #6B645B; border: 1px solid #E0E3E7; }
+    .pv .prc .sorts span.on { background: #414141; color: #fff; border-color: #414141; }
+    .pv .prc .grid { display: flex; flex-wrap: wrap; justify-content: space-between; }
+    .pv .prc .gi { width: 48.5%; padding: 12px 0; }
+    .pv .prc .gi .im { width: 100%; aspect-ratio: 5/4; background: #E8EAED; border-radius: 4px; margin-bottom: 10px; object-fit: cover; display: block; }
+    .pv .prc .wide { padding: 12px 0; }
+    .pv .prc .wide .im { width: 100%; height: 160px; background: #E8EAED; border-radius: 4px; margin-bottom: 10px; object-fit: cover; display: block; }
+    .pv .prc .wide .per { position: absolute; top: 12px; left: 12px; background: #fff; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: 600; color: #4A4A4A; }
+    .pv .prc .rowS { display: flex; gap: 10px; overflow-x: auto; margin-left: -8px; padding-left: 8px; }
+    .pv .prc .si { width: 124px; flex: 0 0 124px; padding: 12px 0 12px 12px; }
+    .pv .prc .si .im { width: 124px; height: 124px; background: #E8EAED; border-radius: 4px; margin-bottom: 10px; object-fit: cover; display: block; }
+    .pv .prc .tl { display: flex; align-items: center; gap: 6px; }
+    .pv .prc .dd { background: #907CFF; color: #fff; font-size: 12px; font-weight: 600; padding: 2px 5px; white-space: nowrap; }
+    .pv .prc .dd.done { background: #999; }
+    .pv .prc .nm { font-size: 16px; font-weight: 600; color: #4A4A4A; line-height: 19.6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pv .prc .ad { margin-top: 4px; font-size: 14px; color: #5D5D5D; line-height: 15.6px; letter-spacing: -.2px; min-height: 31px; white-space: pre-line; }
+    .pv .psl { background: #fff; padding: 14px 16px 20px; }
+    .pv .psl .t { font-size: 18px; font-weight: 600; color: #343434; letter-spacing: -.3px; margin: 8px 0 6px; }
+    .pv .psl .g { margin-top: 6px; }
+    .pv .psl .g b { font-weight: 700; font-size: 16px; color: #5D5D5D; line-height: 24px; letter-spacing: -.3px; }
+    .pv .psl .g span { font-size: 16px; color: #5D5D5D; line-height: 24px; letter-spacing: -.3px; }
+    .pv .psl .div { height: 1px; background: #E0E3E7; margin-top: 24px; }
+    .pv .cmt { padding: 20px 16px; color: #A89F92; font-size: 13px; text-align: center; }
+
+    /* ── 반응형 ───────────────────────────── */
+    @media (max-width: 1100px) {
+      .previewCol { width: 100%; flex-basis: auto; position: static; }
+      .editorWrap { flex-direction: column; }
+      .viewTabs { display: flex; }
+      .previewCol .previewHead { display: none; }
+      .phone { width: 100%; max-width: 375px; margin: 0 auto; height: auto; }
+      .phone .screen { max-height: none; }
+      .editorWrap[data-view="edit"] .previewCol { display: none; }
+      .editorWrap[data-view="preview"] .form { display: none; }
+    }
+    @media (max-width: 860px) {
+      aside.side { position: fixed; left: 0; top: 0; transform: translateX(-100%); transition: transform .2s; z-index: 40; background: #fff; }
+      aside.side.open { transform: none; box-shadow: 0 0 0 100vmax rgba(0,0,0,.3); }
+      .topbar .hamb { display: inline-flex; }
+      .content { padding: 14px; }
+      .toolbar .input { width: 100%; }
+      .toolbar select.input { width: calc(50% - 4px); }
+      .grid3 { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════
+   0. 상수 — 앱 코드와 동일 값 (src/api/admin-posts.ts · src/lib/tourapi.ts · src/api/photoSearch.ts)
+   ═══════════════════════════════════════════════════════════════ */
+const POST_CATEGORIES = ['월별일정', '제철음식', '해외여행', '기타'];
+const MAX_IMAGES = 10;
+const POST_BUCKET = 'post-images';
+const CATEGORY_SLUG = { '월별일정': 'monthly', '제철음식': 'seasonal', '해외여행': 'overseas', '기타': 'etc' };
+const POST_IMAGE_SOURCES = [
+  { value: 'unsplash_free', label: 'Unsplash' },
+  { value: 'tour_api',      label: '한국관광공사' },
+  { value: 'own_photo',     label: '직접 촬영' },
+];
+const POST_IMAGE_LICENSES = [ { value: 'Type1', label: '1유형' }, { value: 'Type3', label: '3유형' } ];
+const PHOTO_ORIGIN_ORDER = ['phoko_award', 'photo_gallery', 'kor_api'];
+const PHOTO_ORIGIN_LABEL = { phoko_award: '관광공모전 수상작', photo_gallery: '관광사진', kor_api: '국문 관광정보' };
+const CONTENT_TYPE = { TOURIST_SPOT: '12', FESTIVAL: '15', RESTAURANT: '39' };
+const CONTENT_TYPE_LABEL = { '12': '관광지', '14': '문화시설', '15': '행사·축제', '25': '여행코스', '28': '레포츠', '32': '숙박', '38': '쇼핑', '39': '음식점' };
+const AREA_CODES = [
+  { code: '1', name: '서울' }, { code: '2', name: '인천' }, { code: '3', name: '대전' }, { code: '4', name: '대구' },
+  { code: '5', name: '광주' }, { code: '6', name: '부산' }, { code: '7', name: '울산' }, { code: '8', name: '세종' },
+  { code: '31', name: '경기' }, { code: '32', name: '강원' }, { code: '33', name: '충북' }, { code: '34', name: '충남' },
+  { code: '35', name: '경북' }, { code: '36', name: '경남' }, { code: '37', name: '전북' }, { code: '38', name: '전남' }, { code: '39', name: '제주' },
+];
+const MODE_LABEL = { month: '월별 행사', restaurant: '음식점', spot: '관광지', keyword: '키워드' };
+const DB_TIMEOUT_MS = 10000;   // 앱 10-10 규칙: 저장 10초 제한
+const CFG_KEY = 'lp_admin_cfg';
+const LAST_ACTIVE_KEY = 'lp_admin_last_active';
+
+/* ═══════════════════════════════════════════════════════════════
+   1. 유틸 — DOM은 textContent로만 (외부 문자열 innerHTML 금지)
+   ═══════════════════════════════════════════════════════════════ */
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+    else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'dataset') Object.assign(node.dataset, v);
+    else if (k in node && typeof v !== 'string') node[k] = v;
+    else node.setAttribute(k, String(v));
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c === null || c === undefined || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); return node; }
+function toast(msg, isErr) {
+  const t = el('div', { class: 'toast' + (isErr ? ' err' : '') }, msg);
+  document.getElementById('toasts').append(t);
+  setTimeout(() => t.remove(), isErr ? 4500 : 2600);
+}
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error((label || '요청') + ' 시간이 초과됐어요 (' + Math.round(ms / 1000) + '초)')), ms);
+    Promise.resolve(promise).then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+  });
+}
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function fmtKoDate(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.'; }
+function fmtShort(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
+
+/* 모달·확인창 */
+function openModal(opts) {
+  const back = el('div', { class: 'modalBack' });
+  const head = el('div', { class: 'modalHead' },
+    el('button', { class: 'btn ghost sm', onClick: () => close() }, opts.cancelLabel || '취소'),
+    el('span', {}, opts.title || ''),
+    el('span', { style: { width: '60px' } }));
+  const body = el('div', { class: 'modalBody' });
+  const foot = el('div', { class: 'modalFoot' });
+  const modal = el('div', { class: 'modal' + (opts.small ? ' sm' : '') }, head, body, foot);
+  back.append(modal);
+  function close() { back.remove(); document.removeEventListener('keydown', esc); opts.onClose && opts.onClose(); }
+  function esc(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', esc);
+  document.body.append(back);
+  return { back, body, foot, close };
+}
+function confirmDialog(message, opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    const m = openModal({ title: opts.title || '확인', small: true, onClose: () => resolve(false) });
+    m.body.append(el('p', { style: { margin: 0, whiteSpace: 'pre-wrap' } }, message));
+    m.foot.append(
+      el('button', { class: 'btn', onClick: () => { m.back.remove(); resolve(false); } }, '취소'),
+      el('button', { class: 'btn primary' + (opts.danger ? '' : ''), style: opts.danger ? { background: '#E74C3C', borderColor: '#E74C3C' } : null,
+        onClick: () => { m.back.remove(); resolve(true); } }, opts.confirmLabel || '확인'));
+  });
+}
+function alertDialog(message, title) {
+  return new Promise(resolve => {
+    const m = openModal({ title: title || '알림', small: true, onClose: () => resolve() });
+    m.body.append(el('p', { style: { margin: 0, whiteSpace: 'pre-wrap' } }, message));
+    m.foot.append(el('button', { class: 'btn primary', onClick: () => { m.back.remove(); resolve(); } }, '확인'));
+  });
+}
+function openLightbox(url) {
+  const lb = el('div', { class: 'lightbox', onClick: () => lb.remove() }, el('img', { src: url, alt: '' }));
+  document.body.append(lb);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2. 설정 (URL·anon 키) — 이 브라우저에만 저장. 운영자가 직접 입력.
+   ═══════════════════════════════════════════════════════════════ */
+function loadCfg() { try { return JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); } catch { return null; } }
+function saveCfg(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch {} }
+function maskKey(k) { if (!k) return ''; return k.length <= 8 ? '********' : k.slice(0, 4) + '…' + '*'.repeat(8) + k.slice(-4); }
+
+let sb = null;        // supabase client
+let state = { user: null, profile: null, view: 'list', cfg: loadCfg() };
+
+function makeClient(cfg) {
+  return window.supabase.createClient(cfg.url, cfg.anonKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. 화면: 설정 · 로그인 · 차단
+   ═══════════════════════════════════════════════════════════════ */
+const app = document.getElementById('app');
+
+function renderSettings(firstTime) {
+  clear(app);
+  const cfg = state.cfg || { url: '', anonKey: '', autoLogoutDays: 7 };
+  const urlIn = el('input', { class: 'input', placeholder: 'https://xxxx.supabase.co', value: cfg.url || '', autocomplete: 'off' });
+  const keyIn = el('input', { class: 'input', type: 'password', placeholder: 'anon public 키 (service_role 키는 넣지 마세요)', value: cfg.anonKey || '', autocomplete: 'off' });
+  const eye = el('button', { class: 'btn sm', type: 'button', onClick: () => { keyIn.type = keyIn.type === 'password' ? 'text' : 'password'; eye.textContent = keyIn.type === 'password' ? '보기' : '숨기기'; } }, '보기');
+  const daysIn = el('select', { class: 'input' },
+    ...[0, 1, 3, 7, 14, 30].map(d => el('option', { value: d, selected: (cfg.autoLogoutDays ?? 7) === d }, d === 0 ? '자동 로그아웃 끔' : d + '일 미사용 시 자동 로그아웃')));
+  const save = el('button', { class: 'btn primary', onClick: () => {
+    const url = urlIn.value.trim().replace(/\/+$/, '');
+    const anonKey = keyIn.value.trim();
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) return toast('Supabase URL 형식이 맞지 않아요 (https://프로젝트.supabase.co)', true);
+    if (!anonKey || anonKey.length < 40) return toast('anon 키를 확인해주세요', true);
+    if (/service_role/i.test(anonKey)) return toast('service_role 키는 넣을 수 없어요', true);
+    state.cfg = { url, anonKey, autoLogoutDays: Number(daysIn.value) };
+    saveCfg(state.cfg);
+    toast('저장했어요');
+    boot();
+  } }, '저장하고 계속');
+  const panel = el('div', { class: 'panel' },
+    brandMark(),
+    el('h2', {}, firstTime ? '처음 설정' : '설정'),
+    el('p', {}, '값은 이 브라우저에만 저장돼요. anon 키는 공개 키(앱에도 포함)이고, service_role 키는 어디에도 넣지 않습니다.'),
+    el('div', { class: 'field' }, el('span', { class: 'label' }, 'Supabase 프로젝트 URL'), urlIn),
+    el('div', { class: 'field' }, el('span', { class: 'label' }, 'anon 키', el('span', { class: 'caption' }, cfg.anonKey ? '저장됨 ' + maskKey(cfg.anonKey) : '')), el('div', { class: 'keyRow' }, keyIn, eye)),
+    el('div', { class: 'field' }, el('span', { class: 'label' }, '보안'), daysIn),
+    save,
+    firstTime ? null : el('button', { class: 'btn ghost', onClick: () => boot() }, '돌아가기'),
+    el('div', { class: 'caption' }, '참고: Supabase 콘솔 → Project Settings → API 에서 URL과 anon public 키를 복사해 넣으세요.'),
+  );
+  app.append(el('div', { class: 'center' }, panel));
+}
+
+function brandMark() {
+  return el('div', { class: 'brand' },
+    el('span', { class: 'logo' }, el('i', { style: { background: '#8DC970' } }), el('i', { style: { background: '#60A4CE' } }), el('i', { style: { background: '#FED23E' } }), el('i', { style: { background: '#FF9A89' } })),
+    '모두의 준비물 · 관리');
+}
+
+function renderLogin(msg) {
+  clear(app);
+  const redirectTo = location.origin + location.pathname;
+  const isFile = location.protocol === 'file:';
+  const btn = el('button', { class: 'btn kakao pill', disabled: isFile, onClick: async () => {
+    btn.disabled = true;
+    const { error } = await sb.auth.signInWithOAuth({ provider: 'kakao', options: { redirectTo } });
+    if (error) { toast(error.message, true); btn.disabled = false; }
+  } }, '카카오로 로그인');
+  app.append(el('div', { class: 'center' }, el('div', { class: 'panel' },
+    brandMark(),
+    el('h2', {}, '포스트 관리 로그인'),
+    el('p', {}, '앱에서 관리자로 쓰는 카카오 계정으로 로그인하세요.'),
+    msg ? el('p', { class: 'warnText' }, msg) : null,
+    btn,
+    isFile ? el('p', { class: 'caption' }, '파일로 직접 열면 카카오 로그인이 돌아올 수 없어요. localhost 서버나 lifepack.kr/admin 으로 열어주세요.') : null,
+    el('p', { class: 'caption' }, '로그인 후 돌아오는 주소: ' + redirectTo, el('br'), 'Supabase → Authentication → URL Configuration → Redirect URLs에 이 주소가 등록돼 있어야 해요.'),
+    el('button', { class: 'btn ghost sm', onClick: () => renderSettings(false) }, '설정'),
+  )));
+}
+
+function renderBlocked(reason) {
+  clear(app);
+  app.append(el('div', { class: 'center' }, el('div', { class: 'panel' },
+    brandMark(),
+    el('h2', {}, '접근 권한이 없어요'),
+    el('p', {}, reason || '이 계정은 staff 권한이 없어요. 앱에서 관리자로 쓰는 계정으로 다시 로그인해주세요.'),
+    el('button', { class: 'btn primary', onClick: logout }, '로그아웃'),
+  )));
+}
+
+async function logout() {
+  try { await sb.auth.signOut(); } catch {}
+  try { localStorage.removeItem(LAST_ACTIVE_KEY); } catch {}
+  state.user = null; state.profile = null;
+  renderLogin();
+}
+
+/* 자동 로그아웃 — 마지막 활동 시각 기준 */
+function touchActive() { try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch {} }
+function expiredByInactivity() {
+  const days = state.cfg?.autoLogoutDays ?? 7;
+  if (!days) return false;
+  const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0);
+  return last > 0 && Date.now() - last > days * 86400000;
+}
+['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, debounce(touchActive, 2000), { passive: true }));
+
+/* ═══════════════════════════════════════════════════════════════
+   4. 부트
+   ═══════════════════════════════════════════════════════════════ */
+async function boot() {
+  if (!state.cfg || !state.cfg.url || !state.cfg.anonKey) return renderSettings(true);
+  if (!window.supabase) { clear(app); app.append(el('div', { class: 'center' }, el('p', {}, 'supabase-js 라이브러리를 불러오지 못했어요. 네트워크를 확인해주세요.'))); return; }
+  sb = makeClient(state.cfg);
+  clear(app); app.append(el('div', { class: 'center' }, el('span', { class: 'spin' })));
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (location.hash.includes('access_token')) history.replaceState(null, '', location.pathname + location.search);
+    if (!session) return renderLogin();
+    if (expiredByInactivity()) { await sb.auth.signOut(); return renderLogin('오랫동안 사용하지 않아 자동으로 로그아웃됐어요.'); }
+    state.user = session.user;
+    const { data: profile, error } = await sb.from('users').select('role, nickname, profile_image').eq('id', session.user.id).maybeSingle();
+    if (error) return renderBlocked('프로필을 확인하지 못했어요: ' + error.message);
+    if (!profile || profile.role !== 'staff') return renderBlocked();
+    state.profile = profile;
+    touchActive();
+    renderShell();
+    showList();
+  } catch (e) {
+    renderLogin('초기화 중 문제가 생겼어요: ' + (e?.message || e));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. 셸 (좌측 메뉴 + 상단바)
+   ═══════════════════════════════════════════════════════════════ */
+let $main, $title, $topActions, $side;
+function renderShell() {
+  clear(app);
+  $side = el('aside', { class: 'side' },
+    brandMark(),
+    el('div', { class: 'menu' },
+      el('div', { class: 'sub' }, '콘텐츠'),
+      el('button', { class: 'on', id: 'menuPosts', onClick: () => { closeSide(); showList(); } }, '📝 월별일정 포스트 작성'),
+      el('div', { class: 'sub' }, '시스템'),
+      el('button', { id: 'menuSettings', onClick: () => { closeSide(); renderSettings(false); } }, '⚙️ 설정'),
+    ),
+    el('div', { class: 'sideFoot' },
+      el('div', { class: 'who' },
+        state.profile.profile_image ? el('img', { src: state.profile.profile_image, alt: '' }) : el('span', { class: 'av' }),
+        el('span', {}, state.profile.nickname || 'Staff', el('br'), el('span', { class: 'caption' }, 'staff'))),
+      el('button', { class: 'btn sm', onClick: logout }, '로그아웃'),
+      el('span', { class: 'caption' }, state.cfg.autoLogoutDays ? state.cfg.autoLogoutDays + '일 미사용 시 자동 로그아웃' : '자동 로그아웃 끔'),
+    ));
+  $title = el('h1', {}, '월별일정 포스트');
+  $topActions = el('div', { class: 'row' });
+  const hamb = el('button', { class: 'iconBtn hamb', onClick: () => $side.classList.toggle('open') }, '☰');
+  $main = el('div', { class: 'content' });
+  app.append($side, el('main', { class: 'main' }, el('div', { class: 'topbar' }, hamb, $title, $topActions), $main));
+  $side.addEventListener('click', e => { if (e.target === $side) closeSide(); });
+}
+function closeSide() { $side && $side.classList.remove('open'); }
+function setTop(title, ...actions) { $title.textContent = title; clear($topActions).append(...actions); }
+
+/* ═══════════════════════════════════════════════════════════════
+   6. 목록
+   ═══════════════════════════════════════════════════════════════ */
+let listCache = [];
+function postMonths(p) {
+  const set = new Set();
+  if (p.month) set.add(p.month);
+  (p.best_months || []).forEach(m => set.add(m));
+  (p.good_months || []).forEach(m => set.add(m));
+  return set.size ? [...set].sort((a, b) => a - b).join('·') + '월' : '';
+}
+async function fetchAdminPosts() {
+  const { data, error } = await sb.from('posts').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(100);
+  if (error) throw error;
+  return data || [];
+}
+async function softDeletePost(id) {
+  const { error } = await sb.from('posts').update({ deleted_at: new Date().toISOString() }).eq('id', id).is('deleted_at', null);
+  return error ? error.message : null;
+}
+
+async function showList() {
+  state.view = 'list';
+  setTop('월별일정 포스트', el('button', { class: 'btn primary sm pill', onClick: () => openEditor(null) }, '＋ 새 글 작성'));
+  clear($main);
+  const q = el('input', { class: 'input', placeholder: '제목 검색' });
+  const cat = el('select', { class: 'input' }, el('option', { value: '' }, '전체 카테고리'), ...POST_CATEGORIES.map(c => el('option', { value: c, selected: c === '월별일정' }, c)));
+  const mon = el('select', { class: 'input' }, el('option', { value: '' }, '모든 달'), ...Array.from({ length: 12 }, (_, i) => el('option', { value: i + 1 }, (i + 1) + '월')));
+  const count = el('span', { class: 'caption' });
+  const refresh = el('button', { class: 'btn sm', onClick: load }, '새로고침');
+  const table = el('table', { class: 'list' });
+  const empty = el('div', { class: 'empty hidden' }, '아직 등록된 글이 없어요');
+  $main.append(el('div', { class: 'toolbar' }, q, cat, mon, refresh, count), table, empty);
+
+  function render() {
+    const kw = q.value.trim().toLowerCase();
+    const rows = listCache.filter(p =>
+      (!cat.value || p.category === cat.value) &&
+      (!mon.value || postMonths(p).includes(mon.value + '월') || p.month === Number(mon.value) || (p.best_months || []).includes(Number(mon.value))) &&
+      (!kw || (p.title || '').toLowerCase().includes(kw)));
+    count.textContent = rows.length + '건 / 전체 ' + listCache.length + '건 (최근 100)';
+    clear(table);
+    table.append(el('thead', {}, el('tr', {}, ...['', '제목', '카테고리', '월', '장소', '사진', '작성일', ''].map(h => el('th', {}, h)))));
+    const tb = el('tbody');
+    rows.forEach(p => {
+      const nLoc = (p.related_location_ids || []).length;
+      const nImg = (p.images || []).length;
+      const tr = el('tr', { class: 'rowBtn', onClick: e => { if (e.target.closest('button')) return; openEditor(p.id); } },
+        el('td', {}, p.thumbnail_url ? el('img', { class: 'thumb', src: p.thumbnail_url, alt: '', loading: 'lazy' }) : el('span', { class: 'thumb' })),
+        el('td', { class: 'tdTitle' }, p.title, p.published_at === null ? el('span', { class: 'tag', style: { marginLeft: '6px' } }, '초안') : null),
+        el('td', {}, p.category ? el('span', { class: 'tag' }, p.category) : ''),
+        el('td', { class: 'small' }, postMonths(p)),
+        el('td', { class: 'small' }, nLoc ? '📍 ' + nLoc : ''),
+        el('td', { class: 'small' }, nImg ? '🖼 ' + nImg : ''),
+        el('td', { class: 'small muted' }, fmtKoDate(p.created_at)),
+        el('td', {}, el('div', { class: 'row' },
+          el('button', { class: 'btn sm', onClick: () => openEditor(p.id) }, '수정'),
+          el('button', { class: 'btn sm danger', onClick: async () => {
+            const ok = await confirmDialog('[' + p.title + ']을(를) 휴지통으로 이동할까요?', { title: '글 삭제', confirmLabel: '삭제', danger: true });
+            if (!ok) return;
+            const err = await softDeletePost(p.id);
+            if (err) toast(err, true); else { toast('휴지통으로 이동했어요'); load(); }
+          } }, '휴지통'))));
+      tb.append(tr);
+    });
+    table.append(tb);
+    empty.classList.toggle('hidden', rows.length > 0);
+  }
+  async function load() {
+    refresh.disabled = true;
+    try { listCache = await withTimeout(fetchAdminPosts(), DB_TIMEOUT_MS, '목록 불러오기'); render(); }
+    catch (e) { toast('글 목록을 불러올 수 없어요: ' + (e?.message || e), true); }
+    finally { refresh.disabled = false; }
+  }
+  [q, cat, mon].forEach(x => x.addEventListener('input', render));
+  await load();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. 저장 규칙 — src/api/admin-posts.ts · src/api/locations.ts 이식
+   ═══════════════════════════════════════════════════════════════ */
+function buildImageCredit(source, photographer) {
+  const name = (photographer || '').trim();
+  switch (source) {
+    case 'unsplash_free': return name ? 'Photo by ' + name + ' on Unsplash' : 'Unsplash';
+    case 'tour_api': { const person = name.replace(/^한국관광공사\s*/, ''); return person ? 'ⓒ한국관광공사 · ' + person : 'ⓒ한국관광공사'; }
+    case 'own_photo': return name ? 'ⓒ모두의 준비물 · ' + name : 'ⓒ모두의 준비물';
+    default: return null;
+  }
+}
+function resolveCredit(img) { return img.sourceType ? buildImageCredit(img.sourceType, img.photographer) : img.legacyCredit; }
+function licenseLabel(l) { const hit = POST_IMAGE_LICENSES.find(x => x.value === l); return hit ? '공공누리 ' + hit.label : '유형 미확인'; }
+function deriveThumbUrl(u) { if (!u) return ''; if (u.includes('/thumb/')) return u; if (u.includes('/post-images/')) return u.replace(/\/([^/]+)$/, '/thumb/$1'); return u; }
+function getPostOriginalImageUrl(t) { if (!t) return null; return t.includes('/thumb/') ? t.replace('/thumb/', '/') : t; }
+function sanitizeSeoSlug(s) { return s.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60); }
+function photoKey(origin, id) { return origin + ':' + id; }
+
+function validate(input) {
+  if (!input.title.trim()) return '제목을 입력해주세요';
+  if (input.title.length > 50) return '제목은 50자 이내로 입력해주세요';
+  if (input.content && input.content.length > 50000) return '본문은 5만자 이내로 입력해주세요';
+  if (input.month !== null && (input.month < 1 || input.month > 12)) return '월은 1~12 사이여야 해요';
+  if (input.subtitle && input.subtitle.length > 300) return '서브타이틀은 300자 이내로 입력해주세요';
+  return null;
+}
+
+/* TourAPI 날짜 변환 */
+function tourapiDateToISO(s) { return (s && s.length === 8) ? s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8) : null; }
+function isoToTourapiDate(iso) { return iso ? iso.slice(0, 10).replace(/-/g, '') : undefined; }
+function areaCodeToSido(code) { if (!code) return null; return AREA_CODES.find(a => a.code === code)?.name ?? null; }
+function safeFloat(s) { if (!s) return null; const n = parseFloat(s); return Number.isFinite(n) ? n : null; }
+
+/* 10-08 D안: 수정 화면 연결 장소 = 실제 행 */
+const LINKED_ITEM_COLUMNS = 'id, tourapi_id, content_type_id, name, address1, address2, thumbnail_url, thumbnail_url_2, lat, lng, area_code, sigungu_code, event_start, event_end, tel, description, staff_note';
+async function fetchLinkedLocationItems(ids) {
+  if (!ids.length) return [];
+  const { data, error } = await sb.from('tourapi_locations').select(LINKED_ITEM_COLUMNS).in('id', ids);
+  if (error) throw error;
+  const byId = new Map((data || []).map(l => [l.id, l]));
+  return ids.map(id => byId.get(id)).filter(Boolean).map(l => ({
+    locationId: l.id, contentId: l.tourapi_id, contentTypeId: l.content_type_id || '', title: l.name,
+    addr1: l.address1 || undefined, addr2: l.address2 || undefined,
+    firstImage: l.thumbnail_url || undefined, firstImage2: l.thumbnail_url_2 || undefined,
+    mapX: l.lng != null ? String(l.lng) : undefined, mapY: l.lat != null ? String(l.lat) : undefined,
+    areaCode: l.area_code || undefined, sigunguCode: l.sigungu_code || undefined,
+    eventStartDate: isoToTourapiDate(l.event_start), eventEndDate: isoToTourapiDate(l.event_end),
+    tel: l.tel || undefined, description: l.description || undefined, note: l.staff_note || undefined,
+  }));
+}
+
+/* 10-08 D안 upsert: 새 장소만 INSERT · 한줄 설명만 UPDATE */
+async function upsertLocations(items) {
+  if (!items.length) return [];
+  const idByTourapiId = new Map();
+  const freshIds = items.filter(i => !i.locationId).map(i => i.contentId);
+  if (freshIds.length) {
+    const { data, error } = await sb.from('tourapi_locations').select('id, tourapi_id').in('tourapi_id', freshIds);
+    if (error) throw error;
+    (data || []).forEach(r => idByTourapiId.set(r.tourapi_id, r.id));
+  }
+  const toInsert = items.filter(i => !i.locationId && !idByTourapiId.has(i.contentId));
+  const rows = toInsert.map(item => {
+    const row = {
+      tourapi_id: item.contentId, content_type_id: item.contentTypeId || null, name: item.title,
+      thumbnail_url: item.firstImage || null, thumbnail_url_2: item.firstImage2 || null,
+      sido: areaCodeToSido(item.areaCode), sigungu: null,
+      area_code: item.areaCode || null, sigungu_code: item.sigunguCode || null,
+      address1: item.addr1 || null, address2: item.addr2 || null,
+      lat: safeFloat(item.mapY), lng: safeFloat(item.mapX),
+      event_start: tourapiDateToISO(item.eventStartDate), event_end: tourapiDateToISO(item.eventEndDate),
+      tel: item.tel || null, staff_note: item.note || null, raw_data: item, cached_at: new Date().toISOString(),
+    };
+    if (item.description && item.description.trim()) row.description = item.description.trim();
+    return row;
+  });
+  if (rows.length) {
+    const { data, error } = await sb.from('tourapi_locations').insert(rows).select('id, tourapi_id');
+    if (error) throw error;
+    (data || []).forEach(r => idByTourapiId.set(r.tourapi_id, r.id));
+  }
+  const ids = items.map(i => i.locationId || idByTourapiId.get(i.contentId)).filter(Boolean);
+  const { data, error } = await sb.from('tourapi_locations').select('*').in('id', ids);
+  if (error) throw error;
+  const byId = new Map((data || []).map(r => [r.id, r]));
+  const descUpdates = items
+    .map(i => ({ id: i.locationId || idByTourapiId.get(i.contentId), desc: (i.description || '').trim() }))
+    .filter(u => u.id && u.desc && byId.get(u.id)?.description !== u.desc);
+  const results = await Promise.all(descUpdates.map(u => sb.from('tourapi_locations').update({ description: u.desc }).eq('id', u.id)));
+  const descError = results.find(r => r.error)?.error;
+  if (descError) throw descError;
+  descUpdates.forEach(u => { const row = byId.get(u.id); if (row) row.description = u.desc; });
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+async function buildPayload(input, userId) {
+  let relatedLocationIds = [];
+  const suggested = {};
+  if (input.tourapi_items && input.tourapi_items.length) {
+    const locations = await upsertLocations(input.tourapi_items);
+    relatedLocationIds = locations.map(l => l.id);
+    suggested.tourapi_items = input.tourapi_items.map((it, idx) => ({ ...it, order: idx }));   // v1.0 backward compat
+  }
+  if (input.packlist && ((input.packlist.title || '').trim() || (input.packlist.groups || []).length)) {
+    suggested.packlist = {
+      title: (input.packlist.title || '').trim(),
+      groups: (input.packlist.groups || []).map(g => ({ label: (g.label || '').trim(), items: (g.items || []).map(i => i.trim()).filter(Boolean) })).filter(g => g.label || g.items.length),
+    };
+  }
+  return {
+    author_id: userId,
+    title: input.title.trim(),
+    subtitle: (input.subtitle || '').trim() || null,
+    category: input.category || null,
+    month: input.month ?? null,
+    best_months: input.best_months && input.best_months.length ? input.best_months : null,
+    thumbnail_url: (input.thumbnail_url || '').trim() || null,
+    images: input.images || [],
+    content: input.content || null,
+    tags: input.tags || [],
+    subsection_title: (input.subsection_title || '').trim() || null,
+    location_group_title: (input.location_group_title || '').trim() || null,
+    attraction_group_title: (input.attraction_group_title || '').trim() || null,
+    related_location_ids: relatedLocationIds,
+    suggested_items: Object.keys(suggested).length ? suggested : null,
+  };
+}
+async function createPost(input, userId) {
+  const v = validate(input); if (v) return { error: v };
+  try {
+    const payload = await buildPayload(input, userId);
+    const { data, error } = await sb.from('posts').insert(payload).select('id').single();
+    if (error) return { error: error.message };
+    if (!data?.id) return { error: '글 ID를 받지 못했어요' };
+    return { data: { id: data.id } };
+  } catch (e) { return { error: e?.message || '저장 중 오류가 발생했어요' }; }
+}
+async function updatePost(id, input, userId) {
+  const v = validate(input); if (v) return { error: v };
+  try {
+    const payload = await buildPayload(input, userId);
+    const { error } = await sb.from('posts').update(payload).eq('id', id).is('deleted_at', null);
+    if (error) return { error: error.message };
+    return {};
+  } catch (e) { return { error: e?.message || '저장 중 오류가 발생했어요' }; }
+}
+
+/* 이미지 Storage — 브라우저 WebP 변환(원본1280·썸네일600) */
+async function fileToBitmap(file) {
+  if ('createImageBitmap' in window) {
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch {}
+  }
+  return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = URL.createObjectURL(file); });
+}
+function bitmapToWebp(bmp, targetWidth, quality) {
+  const srcW = bmp.width || bmp.naturalWidth, srcH = bmp.height || bmp.naturalHeight;
+  const w = Math.min(targetWidth, srcW);
+  const h = Math.round(srcH * w / srcW);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('WebP 변환에 실패했어요 (브라우저 미지원)')), 'image/webp', quality));
+}
+async function uploadToPosts(blob, path) {
+  const { error } = await sb.storage.from(POST_BUCKET).upload(path, blob, { contentType: 'image/webp', upsert: false });
+  if (error) throw error;
+  return sb.storage.from(POST_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+async function uploadPostImage(file, category, seoName) {
+  const slug = CATEGORY_SLUG[category] || 'etc';
+  const ts = Date.now();
+  const seo = seoName ? sanitizeSeoSlug(seoName) : '';
+  const filename = seo ? seo + '-' + ts + '.webp' : ts + '.webp';
+  const bmp = await fileToBitmap(file);
+  const originalWebp = await bitmapToWebp(bmp, 1280, 0.8);
+  const thumbWebp = await bitmapToWebp(bmp, 600, 0.75);
+  const originalUrl = await uploadToPosts(originalWebp, slug + '/' + filename);
+  const thumbUrl = await uploadToPosts(thumbWebp, slug + '/thumb/' + filename);
+  return { thumbUrl, originalUrl };
+}
+function postImagePathFromUrl(url) { const m = '/' + POST_BUCKET + '/'; const i = url.indexOf(m); return i < 0 ? null : url.slice(i + m.length); }
+async function isPostImageInUse(originalUrl, origPath) {
+  const filename = origPath.slice(origPath.lastIndexOf('/') + 1);
+  try {
+    const byImages = await sb.from('posts').select('id', { count: 'exact', head: true }).contains('images', [{ url: originalUrl }]);
+    if (byImages.error) return true;
+    if ((byImages.count || 0) > 0) return true;
+    const byThumb = await sb.from('posts').select('id', { count: 'exact', head: true }).ilike('thumbnail_url', '%' + filename);
+    if (byThumb.error) return true;
+    return (byThumb.count || 0) > 0;
+  } catch { return true; }
+}
+async function deletePostImages(urls) {
+  const paths = [];
+  for (const url of urls) {
+    const p = postImagePathFromUrl(url);
+    if (!p) continue;
+    if (await isPostImageInUse(url, p)) continue;
+    paths.push(p);
+    const t = p.replace(/\/([^/]+)$/, '/thumb/$1');
+    if (t !== p) paths.push(t);
+  }
+  if (!paths.length) return;
+  const { error } = await sb.storage.from(POST_BUCKET).remove(paths);
+  if (error) throw error;
+}
+
+/* Edge Functions */
+function fnErrorMessage(error, fallback) {
+  if (!error) return fallback;
+  const ctx = error.context;
+  if (ctx && ctx.status === 403) return 'staff 전용 기능이에요 (403)';
+  if (ctx && ctx.status === 401) return '로그인이 만료됐어요. 다시 로그인해주세요 (401)';
+  return error.message || fallback;
+}
+async function callTourApi(operation, params) {
+  const { data, error } = await sb.functions.invoke('tourapi-search', { body: { operation, params } });
+  if (error) throw new Error(fnErrorMessage(error, 'TourAPI 호출 실패'));
+  if (!data) throw new Error('TourAPI 응답이 비어있어요');
+  return data;
+}
+async function refreshLocations(contentIds) {
+  if (!contentIds.length) return 0;
+  const { data, error } = await sb.functions.invoke('tourapi-refresh', { body: { contentIds } });
+  if (error) return 0;
+  return data?.refreshed ?? 0;
+}
+async function searchPhotos(keyword, opts) {
+  const { data, error } = await sb.functions.invoke('photo-search', { body: { keyword, pageNo: opts?.pageNo ?? 1, origins: opts?.origins } });
+  if (error) throw new Error(fnErrorMessage(error, '사진 검색에 실패했어요'));
+  if (!data?.sections) throw new Error('사진 검색 응답이 비어있어요');
+  return data.sections;
+}
+function monthRange(year, month) {
+  const p = n => String(n).padStart(2, '0');
+  const last = new Date(year, month, 0).getDate();
+  return { start: year + p(month) + '01', end: year + p(month) + p(last) };
+}
+function normalizeFestivalName(t) { return t.replace(/20\d{2}/g, '').replace(/제?\s*\d+\s*회/g, '').replace(/\s+/g, '').toLowerCase(); }
+function mergeFestivalYears(cur, prev) {
+  const ids = new Set(cur.map(i => i.contentId)), names = new Set(cur.map(i => normalizeFestivalName(i.title)));
+  return [...cur, ...prev.filter(i => !ids.has(i.contentId) && !names.has(normalizeFestivalName(i.title)))];
+}
+function fmtMMDD(s) { return s && s.length === 8 ? s.slice(4, 6) + '/' + s.slice(6, 8) : (s || ''); }
+
+/* ═══════════════════════════════════════════════════════════════
+   8. 편집 화면
+   ═══════════════════════════════════════════════════════════════ */
+function initialImageList(initial) {
+  if (initial?.images?.length) return initial.images.map(img => ({
+    originalUrl: img.url || '', thumbUrl: img.thumb_url || deriveThumbUrl(img.url || ''),
+    sourceType: img.source_type ?? null, photographer: img.photographer || '', license: img.license ?? null,
+    downloadedAt: img.downloaded_at ?? null, legacyCredit: img.credit ?? null, origin: img.origin ?? null, originId: img.origin_id ?? null,
+  }));
+  if (initial?.thumbnail_url) return [{ originalUrl: getPostOriginalImageUrl(initial.thumbnail_url) || initial.thumbnail_url, thumbUrl: initial.thumbnail_url,
+    sourceType: 'unsplash_free', photographer: '', license: null, downloadedAt: null, legacyCredit: null, origin: null, originId: null }];
+  return [];
+}
+
+async function fetchAdminPost(id) {
+  const { data, error } = await sb.from('posts').select('*').eq('id', id).is('deleted_at', null).maybeSingle();
+  if (error) return null;
+  return data;
+}
+
+async function openEditor(postId) {
+  clear($main);
+  $main.append(el('div', { class: 'empty' }, el('span', { class: 'spin' }), ' 불러오는 중…'));
+  let initial = null;
+  if (postId) {
+    const data = await withTimeout(fetchAdminPost(postId), DB_TIMEOUT_MS, '글 불러오기').catch(() => null);
+    if (!data) { toast('글을 불러오지 못했어요', true); return showList(); }
+    const suggested = data.suggested_items || {};
+    const linkedIds = data.related_location_ids || [];
+    let tourapiItems;
+    try { tourapiItems = linkedIds.length ? await fetchLinkedLocationItems(linkedIds) : (suggested.tourapi_items || []); }
+    catch { await alertDialog('연결 장소를 불러오지 못했어요. 잠시 후 다시 시도해주세요.', '실패'); return showList(); }
+    initial = {
+      title: data.title, category: data.category || '월별일정', month: data.month, best_months: data.best_months || null,
+      thumbnail_url: data.thumbnail_url || '', content: data.content || '', tourapi_items: tourapiItems,
+      subtitle: data.subtitle || '', tags: data.tags || [], subsection_title: data.subsection_title || '',
+      location_group_title: data.location_group_title || '', attraction_group_title: data.attraction_group_title || '',
+      images: data.images || [], packlist: suggested.packlist, created_at: data.created_at, updated_at: data.updated_at,
+    };
+  }
+  renderEditor(postId, initial);
+}
+
+function renderEditor(postId, initial) {
+  state.view = 'editor';
+  const mode = postId ? 'edit' : 'create';
+  // ── 상태 (PostForm.tsx와 동일 구조) ──
+  const S = {
+    title: initial?.title || '', subtitle: initial?.subtitle || '',
+    category: initial?.category || '월별일정',
+    months: initial?.best_months?.length ? [...initial.best_months].sort((a, b) => a - b) : (initial?.month != null ? [initial.month] : []),
+    imageList: initialImageList(initial), pendingDeletes: [],
+    content: initial?.content || '',
+    locationGroupTitle: initial?.location_group_title || '', attractionGroupTitle: initial?.attraction_group_title || '',
+    tourapiItems: initial?.tourapi_items || [],
+    imageSeoName: '', tagsText: (initial?.tags || []).join(', '),
+    packTitle: initial?.packlist?.title || '',
+    packGroups: (initial?.packlist?.groups || []).map(g => ({ label: g.label, itemsText: (g.items || []).join(', ') })),
+    saving: false, uploading: false, refreshing: false, dirty: false, slide: 0,
+  };
+  const draftKey = 'lp_admin_draft_' + (postId || 'new');
+
+  // ── 상단바 ──
+  const saveBtn = el('button', { class: 'btn primary sm pill', onClick: handleSave }, mode === 'create' ? '발행' : '저장');
+  const backBtn = el('button', { class: 'btn sm ghost', onClick: async () => {
+    if (S.dirty && !(await confirmDialog('저장하지 않은 변경이 있어요. 나갈까요?\n(임시저장은 이 브라우저에 남아 있어요)', { confirmLabel: '나가기' }))) return;
+    detach(); showList();
+  } }, '← 목록');
+  setTop(mode === 'create' ? '새 글 작성' : '글 수정', backBtn, saveBtn);
+
+  // ── 레이아웃 ──
+  const form = el('div', { class: 'form' });
+  const screen = el('div', { class: 'screen' });
+  const previewCol = el('div', { class: 'previewCol' });
+  const wrap = el('div', { class: 'editorWrap', dataset: { view: 'edit' } });
+  const tabs = el('div', { class: 'viewTabs' },
+    el('button', { class: 'btn sm primary', onClick: e => { wrap.dataset.view = 'edit'; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('primary', b === e.currentTarget)); } }, '편집'),
+    el('button', { class: 'btn sm', onClick: e => { wrap.dataset.view = 'preview'; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('primary', b === e.currentTarget)); renderPreview(); } }, '미리보기'));
+  const collapseBtn = el('button', { class: 'btn sm ghost', onClick: () => { previewCol.classList.toggle('collapsed'); collapseBtn.textContent = previewCol.classList.contains('collapsed') ? '▶' : '접기 ◀'; } }, '접기 ◀');
+  previewCol.append(el('div', { class: 'previewHead' }, el('span', {}, '앱 미리보기 (375)'), collapseBtn), el('div', { class: 'phone' }, screen));
+  wrap.append(form, previewCol);
+  clear($main).append(tabs, wrap);
+
+  const markDirty = () => { S.dirty = true; scheduleDraft(); schedulePreview(); };
+  const scheduleDraft = debounce(() => { try { localStorage.setItem(draftKey, JSON.stringify({ t: Date.now(), S: { ...S, saving: false, uploading: false, refreshing: false } })); } catch {} }, 800);
+  const schedulePreview = debounce(renderPreview, 250);
+
+  // 임시저장 복원 제안
+  try {
+    const raw = localStorage.getItem(draftKey);
+    if (raw) {
+      const d = JSON.parse(raw);
+      const sameBase = !initial || (d.S.title === initial.title) || true;
+      if (sameBase && Date.now() - d.t < 7 * 86400000) {
+        confirmDialog('이 글의 임시저장(' + fmtKoDate(new Date(d.t).toISOString()) + ' ' + new Date(d.t).toTimeString().slice(0, 5) + ')이 있어요. 불러올까요?', { title: '임시저장', confirmLabel: '불러오기' })
+          .then(ok => { if (ok) { Object.assign(S, d.S, { saving: false, uploading: false, refreshing: false, dirty: true }); rebuildAll(); } else localStorage.removeItem(draftKey); });
+      }
+    }
+  } catch {}
+
+  function beforeUnload(e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } }
+  window.addEventListener('beforeunload', beforeUnload);
+  function detach() { window.removeEventListener('beforeunload', beforeUnload); }
+
+  // ── 필드 빌더 ──
+  function labeled(labelText, counter, ...nodes) {
+    return el('div', { class: 'field' }, el('span', { class: 'label' }, labelText, counter || null), ...nodes);
+  }
+  function textInput(key, attrs) {
+    const i = el('input', { class: 'input', value: S[key], ...attrs });
+    i.addEventListener('input', () => { S[key] = i.value; markDirty(); i.dispatchEvent(new CustomEvent('lp-change')); });
+    return i;
+  }
+
+  // 제목
+  const titleCount = el('span', { class: 'caption' });
+  const titleIn = textInput('title', { placeholder: '예: 5월 가볼만한 곳', maxLength: 50 });
+  const updTitleCount = () => { titleCount.textContent = S.title.length + '/50'; titleCount.classList.toggle('warnText', S.title.length >= 50); saveBtn.disabled = !S.title.trim(); };
+  titleIn.addEventListener('lp-change', updTitleCount); updTitleCount();
+  // 서브타이틀
+  const subCount = el('span', { class: 'caption' });
+  const subIn = el('textarea', { class: 'input', rows: 3, maxLength: 300, placeholder: '예: 봄날의 경주에서 즐기는 벚꽃 여행' }); subIn.value = S.subtitle;
+  subIn.addEventListener('input', () => { S.subtitle = subIn.value; subCount.textContent = S.subtitle.length + '/300'; markDirty(); }); subCount.textContent = S.subtitle.length + '/300';
+  // 카테고리
+  const catChips = el('div', { class: 'chips' });
+  function buildCat() { clear(catChips).append(...POST_CATEGORIES.map(c => el('button', { class: 'chip' + (S.category === c ? ' on' : ''), onClick: () => { S.category = c; buildCat(); markDirty(); } }, c))); }
+  buildCat();
+  // 월
+  const monthChips = el('div', { class: 'chips' });
+  function buildMonths() {
+    clear(monthChips).append(
+      el('button', { class: 'chip' + (S.months.length === 0 ? ' on' : ''), onClick: () => { S.months = []; buildMonths(); markDirty(); } }, '무관'),
+      ...Array.from({ length: 12 }, (_, i) => i + 1).map(m => el('button', { class: 'chip' + (S.months.includes(m) ? ' on' : ''), style: { minWidth: '40px', padding: '0 10px' },
+        onClick: () => { S.months = S.months.includes(m) ? S.months.filter(x => x !== m) : [...S.months, m].sort((a, b) => a - b); buildMonths(); markDirty(); } }, m)));
+  }
+  buildMonths();
+  // 태그
+  const tagsIn = textInput('tagsText', { placeholder: '예: 벚꽃, 봄나들이, 경주' });
+
+  // ── 이미지 ──
+  const seoIn = textInput('imageSeoName', { placeholder: '이미지 파일명 (영문, 선택) 예: gyeongju-wolji-night', autocapitalize: 'off' });
+  const imgListEl = el('div');
+  const fileIn = el('input', { type: 'file', accept: 'image/*', multiple: true, class: 'hidden', onChange: () => { handleFiles([...fileIn.files]); fileIn.value = ''; } });
+  const addImgBtn = el('button', { class: 'btn grow', onClick: () => fileIn.click() }, '🖼 사진 추가 (PC 파일)');
+  const searchImgBtn = el('button', { class: 'btn grow', onClick: openPhotoSearch }, '🔍 사진 검색');
+  const imgBtnRow = el('div', { class: 'row' }, addImgBtn, searchImgBtn);
+  const drop = el('div', { class: 'dropZone' }, '여기에 이미지 파일을 끌어다 놓아도 돼요 (WebP 원본 1280 · 썸네일 600으로 변환해 저장)');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/'))); });
+
+  async function handleFiles(files) {
+    if (!files.length) return;
+    if (S.imageList.length >= MAX_IMAGES) return toast('이미지는 최대 ' + MAX_IMAGES + '장까지 추가할 수 있어요', true);
+    const room = MAX_IMAGES - S.imageList.length;
+    const list = files.slice(0, room);
+    S.uploading = true; addImgBtn.disabled = searchImgBtn.disabled = true; addImgBtn.textContent = '업로드 중…';
+    try {
+      for (const f of list) {
+        const { thumbUrl, originalUrl } = await uploadPostImage(f, S.category, S.imageSeoName);
+        S.imageList.push({ originalUrl, thumbUrl, sourceType: 'unsplash_free', photographer: '', license: null, downloadedAt: new Date().toISOString(), legacyCredit: null, origin: null, originId: null });
+        buildImages(); markDirty();
+      }
+      toast(list.length + '장 업로드했어요');
+    } catch (e) { toast(e?.message || '이미지 업로드에 실패했어요', true); }
+    finally { S.uploading = false; addImgBtn.disabled = searchImgBtn.disabled = false; addImgBtn.textContent = '🖼 사진 추가 (PC 파일)'; buildImages(); }
+  }
+  function updateImage(idx, patch) { S.imageList[idx] = { ...S.imageList[idx], ...patch }; buildImages(); markDirty(); }
+  function moveImage(idx, dir) { const n = idx + dir; if (n < 0 || n >= S.imageList.length) return; [S.imageList[idx], S.imageList[n]] = [S.imageList[n], S.imageList[idx]]; buildImages(); markDirty(); }
+  function removeImage(idx) { const img = S.imageList[idx]; if (img?.originalUrl.includes('/post-images/')) S.pendingDeletes.push(img.originalUrl); S.imageList.splice(idx, 1); buildImages(); markDirty(); }
+  function buildImages() {
+    clear(imgListEl);
+    S.imageList.forEach((img, idx) => {
+      const card = el('div', { class: 'card imgCard' });
+      const actions = el('div', { class: 'row' },
+        el('button', { class: 'iconBtn', disabled: idx === 0, onClick: () => moveImage(idx, -1), title: '위로' }, '▲'),
+        el('button', { class: 'iconBtn', disabled: idx === S.imageList.length - 1, onClick: () => moveImage(idx, 1), title: '아래로' }, '▼'),
+        el('button', { class: 'iconBtn del', onClick: () => removeImage(idx), title: '제거' }, '✕'));
+      card.append(el('div', { class: 'row' },
+        el('span', { class: 'idx' }, idx + 1),
+        el('div', { class: 'thumbWrap', style: { cursor: 'zoom-in' }, onClick: () => openLightbox(img.originalUrl) }, el('img', { src: img.thumbUrl, alt: '' })),
+        el('div', { class: 'grow' }, el('div', { class: 'small', style: { fontWeight: 600 } }, idx === 0 ? '대표 이미지' : '이미지 ' + (idx + 1)),
+          el('div', { class: 'caption ellip' }, img.originalUrl)),
+        actions));
+      if (img.origin) {
+        card.append(el('div', { class: 'small muted' }, '자동 기록 · ' + PHOTO_ORIGIN_LABEL[img.origin] + ' · ' + licenseLabel(img.license)),
+          el('div', { class: 'small muted' }, '작가: ' + (img.photographer.trim() || '없음')));
+      } else {
+        card.append(el('div', { class: 'chips' }, ...POST_IMAGE_SOURCES.map(src => el('button', { class: 'chip sm' + (img.sourceType === src.value ? ' on' : ''),
+          onClick: () => updateImage(idx, { sourceType: src.value, ...(src.value === 'tour_api' && !img.license ? { license: 'Type1' } : {}) }) }, src.label))));
+        if (img.sourceType === 'tour_api') card.append(el('div', { class: 'row' }, el('span', { class: 'caption' }, '공공누리 유형'),
+          ...POST_IMAGE_LICENSES.map(l => el('button', { class: 'chip sm' + (img.license === l.value ? ' on' : ''), onClick: () => updateImage(idx, { license: l.value }) }, l.label)),
+          !img.license ? el('span', { class: 'caption' }, '미기록') : null));
+        const ph = el('input', { class: 'input srcInput', placeholder: '작가명 (선택)', value: img.photographer });
+        ph.addEventListener('input', () => { S.imageList[idx].photographer = ph.value; creditLine.textContent = resolveCredit(S.imageList[idx]) ? '표시: ' + resolveCredit(S.imageList[idx]) : ''; markDirty(); });
+        card.append(ph);
+      }
+      const creditLine = el('div', { class: 'caption' }, resolveCredit(img) ? '표시: ' + resolveCredit(img) : '');
+      card.append(creditLine);
+      imgListEl.append(card);
+    });
+    imgBtnRow.classList.toggle('hidden', S.imageList.length >= MAX_IMAGES);
+    drop.classList.toggle('hidden', S.imageList.length >= MAX_IMAGES);
+    addImgBtn.textContent = S.uploading ? '업로드 중…' : '🖼 사진 추가 (' + S.imageList.length + '/' + MAX_IMAGES + ')';
+  }
+
+  // ── 본문 + 툴바 ──
+  const bodyIn = el('textarea', { class: 'input body', placeholder: '## 소제목\n**굵게**  __밑줄__\n=y=형광펜=y= (y노랑 b파랑 r핑크 g그린)\n\n텍스트 선택 후 위 버튼으로도 적용돼요' });
+  bodyIn.value = S.content;
+  bodyIn.addEventListener('input', () => { S.content = bodyIn.value; markDirty(); });
+  function wrapSel(mark, needSelMsg) {
+    const s = bodyIn.selectionStart, e = bodyIn.selectionEnd;
+    if (s === e) return toast(needSelMsg, true);
+    const v = bodyIn.value; bodyIn.value = v.slice(0, s) + mark + v.slice(s, e) + mark + v.slice(e);
+    bodyIn.setSelectionRange(s, e + mark.length * 2); bodyIn.focus(); S.content = bodyIn.value; markDirty();
+  }
+  function applyH2() {
+    const v = bodyIn.value, s = bodyIn.selectionStart;
+    const ls = v.lastIndexOf('\n', s - 1) + 1;
+    bodyIn.value = v.startsWith('## ', ls) ? v.slice(0, ls) + v.slice(ls + 3) : v.slice(0, ls) + '## ' + v.slice(ls);
+    bodyIn.focus(); S.content = bodyIn.value; markDirty();
+  }
+  const hl = (color, mark) => el('button', { class: 'mdBtn hl', title: '형광펜', onClick: () => wrapSel(mark, '형광펜을 칠할 텍스트를 먼저 선택하세요') }, el('i', { style: { background: color } }));
+  const toolbar = el('div', { class: 'mdToolbar' },
+    el('button', { class: 'mdBtn', onClick: applyH2 }, 'H2 소제목'),
+    el('button', { class: 'mdBtn', style: { fontWeight: 700 }, onClick: () => wrapSel('**', '굵게 할 텍스트를 먼저 선택하세요') }, 'B'),
+    el('button', { class: 'mdBtn', style: { textDecoration: 'underline' }, onClick: () => wrapSel('__', '밑줄 칠 텍스트를 먼저 선택하세요') }, 'U'),
+    hl('#FED23E', '=y='), hl('#60A4CE', '=b='), hl('#FF9A89', '=r='), hl('#8DC970', '=g='),
+    el('span', { class: 'caption', style: { alignSelf: 'center' } }, 'Ctrl+B 굵게 · Ctrl+U 밑줄 · Ctrl+S 저장'));
+  bodyIn.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === 'b') { e.preventDefault(); wrapSel('**', '굵게 할 텍스트를 먼저 선택하세요'); }
+    if (e.key === 'u') { e.preventDefault(); wrapSel('__', '밑줄 칠 텍스트를 먼저 선택하세요'); }
+  });
+  document.addEventListener('keydown', function ctrlS(e) { if ((e.ctrlKey || e.metaKey) && e.key === 's' && state.view === 'editor') { e.preventDefault(); handleSave(); } if (state.view !== 'editor') document.removeEventListener('keydown', ctrlS); });
+
+  // ── 준비물리스트 ──
+  const packTitleIn = textInput('packTitle', { placeholder: '리스트 제목 예: 어버이날 준비물리스트', maxLength: 50 });
+  const packListEl = el('div');
+  function buildPack() {
+    clear(packListEl);
+    S.packGroups.forEach((g, idx) => {
+      const lab = el('input', { class: 'input grow', placeholder: '그룹명 예: 기본템', maxLength: 20, value: g.label });
+      lab.addEventListener('input', () => { g.label = lab.value; markDirty(); });
+      const items = el('textarea', { class: 'input', rows: 2, placeholder: '항목 (쉼표 구분) 예: 용돈(현금), 카네이션, 식당예약' }); items.value = g.itemsText;
+      items.addEventListener('input', () => { g.itemsText = items.value; markDirty(); });
+      packListEl.append(el('div', { class: 'card' }, el('div', { class: 'row' }, lab, el('button', { class: 'iconBtn del', onClick: () => { S.packGroups.splice(idx, 1); buildPack(); markDirty(); } }, '✕')), items));
+    });
+  }
+  buildPack();
+
+  // ── 리피팅 그룹 제목 ──
+  const lgIn = textInput('locationGroupTitle', { placeholder: '예: 2026 경주 벚꽃명소', maxLength: 50 });
+  const agIn = textInput('attractionGroupTitle', { placeholder: '예: 도자기 관련 관광지', maxLength: 50 });
+
+  // ── TourAPI 장소 ──
+  const tourListEl = el('div');
+  const refreshBtn = el('button', { class: 'btn grow', onClick: handleRefreshSnapshots }, '⟳ 지금 새로고침');
+  function buildTour() {
+    clear(tourListEl);
+    if (!S.tourapiItems.length) {
+      tourListEl.append(el('button', { class: 'btn', style: { width: '100%' }, onClick: openTourPicker }, '🔍 TourAPI에서 가져오기'));
+      return;
+    }
+    S.tourapiItems.forEach((item, idx) => {
+      const desc = el('input', { class: 'input srcInput', placeholder: '한줄 설명 (선택) — 앱에서 장소명 아래 표시', maxLength: 80, value: item.description || '' });
+      desc.addEventListener('input', () => { item.description = desc.value; markDirty(); });
+      const img = item.firstImage2 || item.firstImage;
+      tourListEl.append(el('div', { class: 'card' },
+        el('div', { class: 'row' },
+          el('span', { class: 'idx' }, idx + 1),
+          el('div', { class: 'thumbWrap', style: { width: '44px', height: '44px', flex: '0 0 44px', background: '#F1F3F4', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, img ? el('img', { src: img, alt: '', style: { maxWidth: '100%', maxHeight: '100%' } }) : null),
+          el('div', { class: 'grow' },
+            el('div', { class: 'row' }, el('span', { class: 'tag' }, CONTENT_TYPE_LABEL[item.contentTypeId] || '기타'), el('span', { class: 'caption' }, 'ID ' + item.contentId), item.locationId ? el('span', { class: 'caption' }, '연결됨') : el('span', { class: 'caption', style: { color: '#60A4CE' } }, '새 연결')),
+            el('div', { class: 'small ellip', style: { fontWeight: 600 } }, item.title),
+            el('div', { class: 'caption ellip' }, item.addr1 || '')),
+          el('div', { class: 'row' },
+            el('button', { class: 'iconBtn', disabled: idx === 0, onClick: () => { [S.tourapiItems[idx - 1], S.tourapiItems[idx]] = [S.tourapiItems[idx], S.tourapiItems[idx - 1]]; buildTour(); markDirty(); } }, '▲'),
+            el('button', { class: 'iconBtn', disabled: idx === S.tourapiItems.length - 1, onClick: () => { [S.tourapiItems[idx + 1], S.tourapiItems[idx]] = [S.tourapiItems[idx], S.tourapiItems[idx + 1]]; buildTour(); markDirty(); } }, '▼'),
+            el('button', { class: 'iconBtn del', onClick: () => { S.tourapiItems = S.tourapiItems.filter(i => i.contentId !== item.contentId); buildTour(); markDirty(); } }, '✕'))),
+        desc));
+    });
+    tourListEl.append(el('div', { class: 'row', style: { marginTop: '4px' } },
+      el('button', { class: 'btn grow', onClick: openTourPicker }, '＋ 더 가져오기'), refreshBtn));
+  }
+  buildTour();
+  async function handleRefreshSnapshots() {
+    const ids = S.tourapiItems.map(i => i.contentId).filter(Boolean);
+    if (!ids.length || S.refreshing) return;
+    S.refreshing = true; refreshBtn.disabled = true; refreshBtn.textContent = '갱신 중…';
+    try { const n = await refreshLocations(ids); await alertDialog(n > 0 ? n + '곳을 최신 정보로 갱신했어요' : '갱신할 장소가 없어요 (저장 후 다시 시도해주세요)', '완료'); }
+    catch { await alertDialog('갱신 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.', '실패'); }
+    finally { S.refreshing = false; refreshBtn.disabled = false; refreshBtn.textContent = '⟳ 지금 새로고침'; }
+  }
+
+  // ── 삭제 ──
+  const delBtn = mode === 'edit' ? el('button', { class: 'btn danger', style: { alignSelf: 'center' }, onClick: async () => {
+    if (!(await confirmDialog('이 글을 휴지통으로 이동할까요?', { title: '글 삭제', confirmLabel: '삭제', danger: true }))) return;
+    const err = await softDeletePost(postId);
+    if (err) toast(err, true); else { S.dirty = false; localStorage.removeItem(draftKey); detach(); toast('휴지통으로 이동했어요'); showList(); }
+  } }, '🗑 휴지통으로 이동') : null;
+
+  // ── 조립 ──
+  form.append(
+    labeled('제목 *', titleCount, titleIn),
+    labeled('서브타이틀 (선택)', subCount, subIn),
+    labeled('카테고리', null, catChips),
+    labeled('월 (1~12 · 여러 달 선택 가능)', null, monthChips),
+    labeled('태그 (선택 · 쉼표로 구분)', null, tagsIn, el('span', { class: 'helper' }, '최대 8개 · 각 20자 (초과분은 저장 시 자동 정리)')),
+    labeled('이미지 (선택 · 최대 ' + MAX_IMAGES + '장, 첫 장이 대표)', null, seoIn, imgListEl, imgBtnRow, drop, fileIn),
+    labeled('본문 (## 소제목 · =y=형광펜=y= · **굵게** · __밑줄__)', null, toolbar, bodyIn),
+    labeled('준비물리스트 (선택)', null, el('span', { class: 'helper' }, '본문 아래 카드로 표시돼요. 그룹별 항목은 쉼표로 구분하세요.'), packTitleIn, packListEl,
+      el('button', { class: 'btn', onClick: () => { S.packGroups.push({ label: '', itemsText: '' }); buildPack(); markDirty(); } }, '＋ 그룹 추가')),
+    labeled('리피팅 그룹 제목 — 축제행사 (선택)', null, el('span', { class: 'helper' }, '비우면 "이달의 명소". TourAPI 행사(축제) 유형이 이 섹션에 표시'), lgIn),
+    labeled('리피팅 그룹 제목 — 관광지 (선택)', null, el('span', { class: 'helper' }, '비우면 "관련 관광지". 행사 외 유형(관광지·문화시설 등)이 이 섹션에 표시'), agIn),
+    labeled('포스팅 내 리피팅 그룹 (TourAPI)', null, el('span', { class: 'helper' }, '관광공사 공공데이터에서 행사·관광지·음식점을 검색해 추가. 저장은 장소 연결 + 한줄 설명만 기록하고 장소 정보는 동기화가 채워요.'), tourListEl),
+    delBtn,
+    el('div', { style: { height: '40px' } }),
+  );
+  buildImages();
+  renderPreview();
+
+  function rebuildAll() {
+    titleIn.value = S.title; updTitleCount(); subIn.value = S.subtitle; subCount.textContent = S.subtitle.length + '/300';
+    buildCat(); buildMonths(); tagsIn.value = S.tagsText; seoIn.value = S.imageSeoName; buildImages();
+    bodyIn.value = S.content; packTitleIn.value = S.packTitle; buildPack(); lgIn.value = S.locationGroupTitle; agIn.value = S.attractionGroupTitle; buildTour(); renderPreview();
+  }
+
+  // ── 저장 (PostForm.handleSave 이식) ──
+  async function handleSave() {
+    if (S.saving) return;
+    if (!state.user) return toast('로그인이 필요해요', true);
+    if (!S.title.trim()) return toast('제목을 입력해주세요', true);
+    S.saving = true; saveBtn.disabled = true; saveBtn.textContent = '저장 중…';
+    const tags = S.tagsText.split(',').map(t => t.trim()).filter(Boolean).filter((t, i, a) => a.indexOf(t) === i).slice(0, 8).map(t => t.slice(0, 20));
+    const images = S.imageList.map(i => ({
+      url: i.originalUrl, credit: resolveCredit(i), source_type: i.sourceType, photographer: i.photographer.trim() || null,
+      license: i.sourceType === 'tour_api' ? i.license : null, downloaded_at: i.downloadedAt,
+      ...(i.origin ? { origin: i.origin, origin_id: i.originId, thumb_url: i.thumbUrl } : {}),
+    }));
+    const packlist = { title: S.packTitle.trim(), groups: S.packGroups.map(g => ({ label: g.label.trim(), items: g.itemsText.split(',').map(x => x.trim()).filter(Boolean) })).filter(g => g.label || g.items.length) };
+    const month = S.months[0] ?? null;
+    const input = {
+      title: S.title, subtitle: S.subtitle, category: S.category, month,
+      best_months: S.months.length > 1 ? S.months : null,
+      thumbnail_url: S.imageList[0]?.thumbUrl || '', images, content: S.content,
+      location_group_title: S.locationGroupTitle, attraction_group_title: S.attractionGroupTitle,
+      tourapi_items: S.tourapiItems, tags, packlist,
+    };
+    const finalUrls = new Set(S.imageList.map(i => i.originalUrl));
+    const toDelete = S.pendingDeletes.filter(u => !finalUrls.has(u));
+    const cleanupImages = () => { if (toDelete.length) deletePostImages(toDelete).catch(() => {}); };
+    const triggerSnapshot = () => { const ids = S.tourapiItems.map(i => i.contentId).filter(Boolean); if (ids.length) refreshLocations(ids).catch(() => {}); };
+    try {
+      if (mode === 'create') {
+        const r = await withTimeout(createPost(input, state.user.id), DB_TIMEOUT_MS, '저장');
+        if (r.error) await alertDialog(r.error, '저장 실패');
+        else { cleanupImages(); triggerSnapshot(); S.dirty = false; localStorage.removeItem(draftKey); detach(); toast('글이 발행되었어요'); await openEditor(r.data.id); return; }
+      } else {
+        const r = await withTimeout(updatePost(postId, input, state.user.id), DB_TIMEOUT_MS, '저장');
+        if (r.error) await alertDialog(r.error, '저장 실패');
+        else { cleanupImages(); triggerSnapshot(); S.dirty = false; S.pendingDeletes = []; localStorage.removeItem(draftKey); toast('저장되었어요'); detach(); await openEditor(postId); return; }
+      }
+    } catch (e) { await alertDialog((e?.message || '저장 중 오류가 발생했어요') + '\n\n입력한 내용은 그대로 남아 있어요. 네트워크를 확인하고 다시 저장해주세요.', '저장 실패'); }
+    finally { S.saving = false; saveBtn.disabled = !S.title.trim(); saveBtn.textContent = mode === 'create' ? '발행' : '저장'; }
+  }
+
+  /* ── 사진 검색 모달 (PhotoSearchSheet 이식) ── */
+  function openPhotoSearch() {
+    const remaining = MAX_IMAGES - S.imageList.length;
+    const existing = new Set(S.imageList.filter(i => i.origin && i.originId).map(i => photoKey(i.origin, i.originId)));
+    let sections = {}, picked = [], searched = '', widths = {};
+    const m = openModal({ title: '사진 검색' });
+    const kw = el('input', { class: 'input', placeholder: '예: 화담숲 단풍, 불국사, 해운대' });
+    const sBtn = el('button', { class: 'btn primary pill', style: { width: '100%' }, onClick: doSearch }, '검색');
+    const results = el('div');
+    const countEl = el('span', { class: 'count' });
+    const okBtn = el('button', { class: 'btn primary pill', disabled: true, onClick: () => { if (!picked.length) return; handleAddFromSearch(picked); m.close(); } }, '추가하기');
+    kw.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    m.body.append(kw, el('span', { class: 'helper' }, '띄어 쓴 단어 조합이 잘 맞아요 (예: 세종 축제)'), el('span', { class: 'helper' }, '사진을 누르면 크게 보기 · 오른쪽 위 원을 누르면 선택 (선택한 순서대로 들어가요)'), sBtn, results);
+    m.foot.append(countEl, okBtn);
+    updateCount();
+    function updateCount() { clear(countEl).append('선택 ', el('b', {}, String(picked.length)), ' / ' + remaining + '장'); okBtn.disabled = picked.length === 0; }
+    async function doSearch() {
+      const k = kw.value.trim(); if (!k) return toast('검색어를 입력해주세요', true);
+      sBtn.disabled = true; sBtn.textContent = '검색 중…'; clear(results).append(el('div', { class: 'empty' }, el('span', { class: 'spin' })));
+      try { const r = await searchPhotos(k); sections = {}; r.forEach(s => sections[s.origin] = s); searched = k; render(); }
+      catch (e) { clear(results); toast(e?.message || '사진 검색에 실패했어요', true); }
+      finally { sBtn.disabled = false; sBtn.textContent = '검색'; }
+    }
+    async function more(origin) {
+      const cur = sections[origin]; if (!cur || !searched) return;
+      try {
+        const [sec] = await searchPhotos(searched, { pageNo: cur.pageNo + 1, origins: [origin] });
+        if (!sec) return; if (sec.error) return toast(sec.error, true);
+        const seen = new Set(cur.items.map(i => photoKey(i.origin, i.originId)));
+        sections[origin] = { ...cur, items: [...cur.items, ...sec.items.filter(i => !seen.has(photoKey(i.origin, i.originId)))], pageNo: sec.pageNo, totalCount: sec.totalCount, hasMore: sec.hasMore };
+        render();
+      } catch (e) { toast(e?.message || '더 불러오기에 실패했어요', true); }
+    }
+    function toggle(item) {
+      const key = photoKey(item.origin, item.originId);
+      if (existing.has(key)) return;
+      const i = picked.findIndex(p => photoKey(p.origin, p.originId) === key);
+      if (i >= 0) picked.splice(i, 1);
+      else { if (picked.length >= remaining) return toast('이 글에는 ' + remaining + '장만 더 넣을 수 있어요 (최대 10장)', true); picked.push(item);
+        if (widths[key] === undefined) { const im = new Image(); im.onload = () => { widths[key] = im.naturalWidth; render(); }; im.src = item.imageUrl; } }
+      updateCount(); render();
+    }
+    function render() {
+      clear(results);
+      PHOTO_ORIGIN_ORDER.forEach(origin => {
+        const sec = sections[origin]; if (!sec) return;
+        const box = el('div');
+        box.append(el('div', { class: 'secHead' }, el('b', {}, PHOTO_ORIGIN_LABEL[origin]), !sec.error ? el('span', { class: 'caption' }, sec.totalCount + '장') : null));
+        if (sec.error) box.append(el('div', { class: 'caption warnText' }, '불러오지 못했어요 · ' + sec.error));
+        else if (!sec.items.length) box.append(el('div', { class: 'caption' }, '결과가 없어요'));
+        else {
+          const grid = el('div', { class: 'grid3' });
+          sec.items.forEach(item => {
+            const key = photoKey(item.origin, item.originId);
+            const added = existing.has(key);
+            const order = picked.findIndex(p => photoKey(p.origin, p.originId) === key) + 1;
+            const pic = el('div', { class: 'pic' + (order ? ' on' : ''), onClick: () => openLightbox(item.imageUrl) }, el('img', { src: item.thumbUrl, alt: '', loading: 'lazy' }));
+            if (added) pic.append(el('div', { class: 'added' }, '추가됨'));
+            else pic.append(el('div', { class: 'pick' + (order ? ' on' : ''), onClick: e => { e.stopPropagation(); toggle(item); } }, order ? String(order) : ''));
+            grid.append(el('div', { class: 'tile' + (added ? ' dim' : '') }, pic,
+              el('span', { class: 'ellip' }, item.location || item.title),
+              item.photographer ? el('span', { class: 'ellip' }, item.photographer) : null,
+              item.license ? el('span', { class: 'caption' }, licenseLabel(item.license)) : null,
+              widths[key] !== undefined ? el('span', { class: 'caption' }, '폭 ' + widths[key] + 'px') : null));
+          });
+          box.append(grid);
+        }
+        if (!sec.error && sec.hasMore) box.append(el('button', { class: 'btn sm', style: { marginTop: '8px' }, onClick: () => more(origin) }, '⌄ 더 보기'));
+        results.append(box);
+      });
+    }
+  }
+  function handleAddFromSearch(items) {
+    const room = MAX_IMAGES - S.imageList.length, now = new Date().toISOString();
+    items.slice(0, Math.max(0, room)).forEach(it => S.imageList.push({ originalUrl: it.imageUrl, thumbUrl: it.thumbUrl, sourceType: 'tour_api', photographer: it.photographer || '', license: it.license || null, downloadedAt: now, legacyCredit: null, origin: it.origin, originId: it.originId }));
+    buildImages(); markDirty();
+  }
+
+  /* ── TourAPI 검색 모달 (TourApiPicker 이식) ── */
+  function openTourPicker() {
+    const now = new Date();
+    let mode = S.category === '제철음식' ? 'restaurant' : 'month';
+    let areaCode = '', year = now.getFullYear(), month = now.getMonth() + 1, keyword = '', results = [], picked = [...S.tourapiItems], loading = false;
+    const dm = S.months[0];
+    if (dm >= 1 && dm <= 12) { month = dm; year = dm < now.getMonth() + 1 ? now.getFullYear() + 1 : now.getFullYear(); }
+    const m = openModal({ title: 'TourAPI 검색' });
+    const modeChips = el('div', { class: 'chips' }), areaChips = el('div', { class: 'chips' });
+    const ym = el('div', { class: 'row' });
+    const kwIn = el('input', { class: 'input', placeholder: '예: 제철, 시장, 벚꽃' }); kwIn.addEventListener('input', () => keyword = kwIn.value); kwIn.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+    const sBtn = el('button', { class: 'btn primary pill', style: { width: '100%' }, onClick: search }, '검색');
+    const list = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, el('div', { class: 'empty' }, '검색 결과가 여기 표시돼요'));
+    const countEl = el('span', { class: 'count' });
+    const okBtn = el('button', { class: 'btn primary pill', onClick: () => { S.tourapiItems = picked; buildTour(); markDirty(); m.close(); } }, '추가하기');
+    m.body.append(modeChips, areaChips, ym, kwIn, sBtn, list); m.foot.append(countEl, okBtn);
+    function buildForm() {
+      clear(modeChips).append(...Object.keys(MODE_LABEL).map(k => el('button', { class: 'chip' + (mode === k ? ' on' : ''), onClick: () => { mode = k; results = []; renderList(); buildForm(); } }, MODE_LABEL[k])));
+      clear(areaChips).append(el('button', { class: 'chip sm' + (areaCode === '' ? ' on' : ''), onClick: () => { areaCode = ''; buildForm(); } }, '전국'),
+        ...AREA_CODES.map(a => el('button', { class: 'chip sm' + (areaCode === a.code ? ' on' : ''), onClick: () => { areaCode = a.code; buildForm(); } }, a.name)));
+      clear(ym);
+      if (mode === 'month') ym.append(
+        el('div', { class: 'grow' }, el('span', { class: 'helper' }, '연도'), el('div', { class: 'stepper' }, el('button', { onClick: () => { year--; buildForm(); } }, '‹'), el('span', {}, String(year)), el('button', { onClick: () => { year++; buildForm(); } }, '›'))),
+        el('div', { class: 'grow' }, el('span', { class: 'helper' }, '월'), el('div', { class: 'stepper' }, el('button', { onClick: () => { if (month === 1) { month = 12; year--; } else month--; buildForm(); } }, '‹'), el('span', {}, month + '월'), el('button', { onClick: () => { if (month === 12) { month = 1; year++; } else month++; buildForm(); } }, '›'))));
+      kwIn.classList.toggle('hidden', mode !== 'keyword');
+      clear(countEl).append('선택 ', el('b', {}, String(picked.length)), '개'); okBtn.disabled = picked.length === 0;
+    }
+    async function search() {
+      if (loading) return;
+      const params = { numOfRows: 30, pageNo: 1, arrange: 'C' }; if (areaCode) params.areaCode = areaCode;
+      loading = true; sBtn.disabled = true; sBtn.textContent = '검색 중…'; clear(list).append(el('div', { class: 'empty' }, el('span', { class: 'spin' })));
+      try {
+        let items;
+        if (mode === 'month') {
+          const cur = monthRange(year, month), prev = monthRange(year - 1, month);
+          const [a, b] = await Promise.all([callTourApi('searchFestival2', { ...params, eventStartDate: cur.start, eventEndDate: cur.end }), callTourApi('searchFestival2', { ...params, eventStartDate: prev.start, eventEndDate: prev.end })]);
+          items = mergeFestivalYears(a.items, b.items);
+        } else if (mode === 'restaurant') { params.contentTypeId = CONTENT_TYPE.RESTAURANT; items = (await callTourApi('areaBasedList2', params)).items; }
+        else if (mode === 'spot') { params.contentTypeId = CONTENT_TYPE.TOURIST_SPOT; items = (await callTourApi('areaBasedList2', params)).items; }
+        else { if (!keyword.trim()) { toast('키워드를 입력해주세요', true); clear(list); return; } params.keyword = keyword.trim(); items = (await callTourApi('searchKeyword2', params)).items; }
+        results = items; renderList(); if (!items.length) toast('검색 결과가 없어요');
+      } catch (e) { clear(list); toast(e?.message || 'TourAPI 검색 실패', true); }
+      finally { loading = false; sBtn.disabled = false; sBtn.textContent = '검색'; }
+    }
+    function renderList() {
+      clear(list);
+      if (!results.length) return list.append(el('div', { class: 'empty' }, '검색 결과가 여기 표시돼요'));
+      results.forEach(item => {
+        const sel = picked.some(p => p.contentId === item.contentId);
+        const img = item.firstImage2 || item.firstImage;
+        list.append(el('div', { class: 'resultCard' + (sel ? ' on' : ''), onClick: () => { picked = sel ? picked.filter(p => p.contentId !== item.contentId) : [...picked, { ...item, order: picked.length }]; renderList(); buildForm(); } },
+          img ? el('img', { src: img, alt: '', loading: 'lazy' }) : el('div', { class: 'noimg' }, '이미지 없음'),
+          el('div', { class: 'grow' },
+            el('div', { class: 'row' }, el('span', { class: 'tag' }, CONTENT_TYPE_LABEL[item.contentTypeId] || '기타'),
+              item.eventStartDate && Number(item.eventStartDate.slice(0, 4)) < year ? el('span', { class: 'tag outline' }, item.eventStartDate.slice(0, 4) + ' 자료') : null,
+              item.eventStartDate && item.eventEndDate ? el('span', { class: 'caption' }, fmtMMDD(item.eventStartDate) + ' ~ ' + fmtMMDD(item.eventEndDate)) : null),
+            el('div', { class: 'small ellip', style: { fontWeight: 600 } }, item.title),
+            el('div', { class: 'caption ellip' }, item.addr1 || ''),
+            el('div', { class: 'caption' }, 'ID ' + item.contentId)),
+          el('div', { class: 'checkbox' + (sel ? ' on' : '') }, sel ? '✓' : '')));
+      });
+    }
+    buildForm();
+  }
+
+  /* ── 미리보기 (app/post/[id].tsx §1~§7 재현) ── */
+  function renderInline(line) {
+    const re = /\*\*(.+?)\*\*|__(.+?)__|=([ybrg])=(.+?)=\3=|==(.+?)==/g;
+    const nodes = []; let last = 0, mt;
+    while ((mt = re.exec(line)) !== null) {
+      if (mt.index > last) nodes.push(line.slice(last, mt.index));
+      if (mt[1] !== undefined) nodes.push(el('b', {}, mt[1]));
+      else if (mt[2] !== undefined) nodes.push(el('u', {}, mt[2]));
+      else if (mt[4] !== undefined) nodes.push(el('mark', { class: mt[3] }, mt[4]));
+      else nodes.push(el('mark', { class: 'b' }, mt[5]));
+      last = mt.index + mt[0].length;
+    }
+    if (last < line.length) nodes.push(line.slice(last));
+    return nodes;
+  }
+  function contentBlock(text) {
+    const lines = text.replace(/\r/g, '').split('\n');
+    const box = el('div', { class: 'pc' });
+    lines.forEach((line, idx) => {
+      if (line.startsWith('## ')) return box.append(el('h2', {}, ...renderInline(line.slice(3))));
+      if (line.trim() === '') { if (idx > 0 && lines[idx - 1].startsWith('## ')) return; return box.append(el('div', { class: 'gap' })); }
+      box.append(el('p', {}, ...renderInline(line)));
+    });
+    return box;
+  }
+  function periodParts(iso) { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; const p = n => String(n).padStart(2, '0'); return { y: d.getFullYear(), md: p(d.getMonth() + 1) + '. ' + p(d.getDate()) }; }
+  function formatPeriod(start, end) {
+    const s = periodParts(start), e = periodParts(end);
+    if (s && e) return s.y === e.y ? (s.md === e.md ? s.y + '. ' + s.md : s.y + '. ' + s.md + ' - ' + e.md) : s.y + '. ' + s.md + ' - ' + e.y + '. ' + e.md;
+    const one = s || e; return one ? one.y + '. ' + one.md : null;
+  }
+  function ddayLabel(start, end, isFestival) {
+    if (!start) return isFestival ? '일정 미정' : null;
+    const s = new Date(start), e = new Date(end || start); if (isNaN(s) || isNaN(e)) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0); s.setHours(0, 0, 0, 0); e.setHours(0, 0, 0, 0);
+    if (today < s) return 'D-' + Math.round((s - today) / 86400000);
+    if (today <= e) return '진행중';
+    return '행사종료';
+  }
+  function splitAddr(full) { full = (full || '').trim(); if (!full) return ''; const parts = full.split(/\s+/); const rest = parts.slice(2).join(' '); return rest ? parts.slice(0, 2).join(' ') + '\n' + rest : full; }
+  function locCard(item, kind) {
+    const img = item.firstImage2 || item.firstImage;
+    const start = tourapiDateToISO(item.eventStartDate), end = tourapiDateToISO(item.eventEndDate);
+    const dd = ddayLabel(start, end, item.contentTypeId === '15');
+    const c = el('div', { class: kind }, img ? el('img', { class: 'im', src: img, alt: '' }) : el('div', { class: 'im' }));
+    if (kind === 'wide') { const per = formatPeriod(start, end); c.style.position = 'relative'; if (per) c.append(el('span', { class: 'per' }, per)); }
+    c.append(el('div', { class: 'tl' }, kind !== 'wide' && dd ? el('span', { class: 'dd' + (dd === '행사종료' || dd === '일정 미정' ? ' done' : '') }, dd) : null, el('div', { class: 'nm' }, item.title)),
+      el('div', { class: 'ad' }, kind === 'gi' ? splitAddr(item.addr1).replace(/\n/g, ' ') : splitAddr(item.addr1)));
+    return c;
+  }
+  function renderPreview() {
+    if (!screen.isConnected) return;
+    const pv = el('div', { class: 'pv' });
+    const tags = S.tagsText.split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
+    pv.append(el('div', { class: 'hdr' }, tags[0] || ''));
+    pv.append(el('div', { class: 'ptb' }, el('div', { class: 'title' }, S.title || '제목')));
+    const nick = state.profile?.nickname || 'Staff';
+    pv.append(el('div', { class: 'pab' },
+      state.profile?.profile_image ? el('img', { class: 'av', src: state.profile.profile_image, alt: '' }) : el('div', { class: 'av' }, nick.slice(0, 1)),
+      el('div', {}, el('div', { class: 'nm' }, nick, el('span', {}, 'Staff')), el('div', { class: 'mt' }, fmtShort(initial?.created_at || new Date().toISOString()) + ' 작성'))));
+    if (S.subtitle) pv.append(el('div', { class: 'pst' }, S.subtitle));
+    // 슬라이더
+    const slides = S.imageList.length ? S.imageList : [null];
+    S.slide = Math.min(S.slide, slides.length - 1);
+    const cur = slides[S.slide];
+    const slider = el('div', { class: 'slider' });
+    if (cur) {
+      const im = el('img', { src: cur.originalUrl, alt: '', class: 'cover' });
+      im.addEventListener('load', () => { im.className = im.naturalWidth / im.naturalHeight >= 1 ? 'cover' : 'contain'; });
+      slider.append(im);
+    } else slider.append(el('div', { class: 'fallback' }, S.months[0] ? S.months[0] + '월' : '—'));
+    if (slides.length > 1) slider.append(
+      el('button', { class: 'nav l', onClick: () => { S.slide = (S.slide - 1 + slides.length) % slides.length; renderPreview(); } }, '‹'),
+      el('button', { class: 'nav r', onClick: () => { S.slide = (S.slide + 1) % slides.length; renderPreview(); } }, '›'),
+      el('span', { class: 'badge' }, (S.slide + 1) + '/' + slides.length));
+    pv.append(slider);
+    const showBand = S.months.length > 0;
+    const credit = cur ? resolveCredit(cur) : null;
+    if (credit) pv.append(el('div', { class: 'credit' + (showBand ? '' : ' last') }, credit));
+    if (showBand) pv.append(el('div', { class: 'band' }, tags[0] ? el('span', { class: 'lbl' }, tags[0]) : null,
+      el('div', { class: 'dots' }, ...Array.from({ length: 12 }, (_, i) => el('i', { class: S.months.includes(i + 1) ? 'best' : '' }, i + 1)))));
+    if (S.content) pv.append(contentBlock(S.content));
+    if (tags.length) pv.append(el('div', { class: 'tags' }, ...tags.map(t => el('span', {}, '#' + t))));
+    // 준비물리스트 카드
+    const groups = S.packGroups.map(g => ({ label: g.label.trim(), items: g.itemsText.split(',').map(x => x.trim()).filter(Boolean) })).filter(g => g.label || g.items.length);
+    const hasPack = S.packTitle.trim() || groups.length;
+    const packCard = hideDiv => el('div', { class: 'psl' }, el('div', { class: 't' }, S.packTitle.trim()),
+      ...groups.map(g => el('div', { class: 'g' }, el('b', {}, '+ ' + g.label + ' '), el('span', {}, g.items.join(', ')))), hideDiv ? null : el('div', { class: 'div' }));
+    // 리피팅
+    if (S.tourapiItems.length) {
+      const fest = S.tourapiItems.filter(i => i.contentTypeId === '15'), place = S.tourapiItems.filter(i => i.contentTypeId !== '15');
+      const prc = el('div', { class: 'prc' });
+      if (fest.length) {
+        prc.append(el('div', { class: 't' }, '🔥 ' + (S.locationGroupTitle.trim() || '이달의 명소')));
+        if (fest.length > 1) prc.append(el('div', { class: 'sorts' }, el('span', { class: 'on' }, '인기도'), el('span', {}, '종료 임박'), el('span', {}, '근거리')));
+        prc.append(fest.length === 1 ? locCard(fest[0], 'wide') : el('div', { class: 'grid' }, ...fest.map(i => locCard(i, 'gi'))));
+      }
+      if (hasPack) prc.append(packCard(true));
+      if (place.length) {
+        prc.append(el('div', { class: 't', style: { marginTop: '16px' } }, '🎪 ' + (S.attractionGroupTitle.trim() || '관련 관광지')));
+        if (place.length > 1) prc.append(el('div', { class: 'sorts' }, el('span', { class: 'on' }, '인기도'), el('span', {}, '근거리')));
+        for (let i = 0; i < place.length; i += 4) prc.append(el('div', { class: 'rowS' }, ...place.slice(i, i + 4).map(p => locCard(p, 'si'))));
+      }
+      pv.append(prc);
+    } else if (hasPack) pv.append(packCard(false));
+    pv.append(el('div', { class: 'cmt' }, '💬 댓글 (앱에서 표시)'));
+    clear(screen).append(pv);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   9. 시작
+   ═══════════════════════════════════════════════════════════════ */
+boot();
+</script>
+</body>
+</html>
