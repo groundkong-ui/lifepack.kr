@@ -160,7 +160,7 @@
     .checkbox { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; flex: 0 0 24px; }
     .checkbox.on { background: var(--cta); border-color: var(--cta); }
     .outline { border: 1px solid var(--line); background: var(--surface); }
-    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .grid3 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; } /* 2026-10-16 문지영: 3열 → 4열 → 5열 (타일 약 178px, 장수는 구역당 30 유지). 폰 폭은 아래 2열 그대로 */
     .tile { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-soft); }
     .tile .pic { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--band); cursor: zoom-in; border: 2px solid transparent; }
     .tile .pic.on { border-color: var(--cta); }
