@@ -251,6 +251,60 @@
     .pv .psl .div { height: 1px; background: #E0E3E7; margin-top: 24px; }
     .pv .cmt { padding: 20px 16px; color: #A89F92; font-size: 13px; text-align: center; }
 
+    /* ── 준비물 템플릿 (2026-10-17) — 왼쪽 세로 펼침 + 오른쪽 앱 3단계 재현 ── */
+    /* 2026-10-17 문지영: 3단계와 같은 2열 — 왼쪽 레일(BASE·일상·인생) / 오른쪽 카테고리 전부 세로 */
+    .tvCols { display: flex; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); min-height: 60vh; background: #fff; }
+    .tvRail { width: 200px; flex: 0 0 200px; background: #F3F3F3; align-self: stretch; }
+    .tvSec { font-size: 11px; color: #727272; padding: 14px 16px 4px; letter-spacing: .3px; }
+    .tvRow { height: 44px; padding: 0 10px 0 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #fff; font-size: 15px; color: #636363; cursor: pointer; }
+    .tvRow.on { background: #fff; color: #1B1B1B; font-weight: 600; }
+    .tvRow.miss { color: #A0A0A0; }
+    .tvRow .em { width: 20px; text-align: center; } .tvRow .lb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .tvRow .ct { font-size: 12px; color: #A0A0A0; }
+    .tvMain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .tvCat { border-bottom: 10px solid #F3F3F3; }
+    .tvCat.dim { opacity: .35; }
+    .tvCat { display: block; min-height: 0; }           /* p3의 flex·min-height 100% 해제 — 헤더가 첫 항목을 가리던 문제 */
+    .tvCat .ch { border-top-right-radius: 0; }
+    .tvCat .chSub { font-size: 12px; color: #727272; margin-left: 4px; }
+    .tvCat .chSrc { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff; border: 1px solid #E2E2E2; color: #636363; margin-left: 6px; }
+    .tvCat .chCnt { margin-left: auto; font-size: 12px; color: #A0A0A0; white-space: nowrap; }
+    .tvCat .gCnt { font-size: 11px; color: #A0A0A0; }
+    .tvCat .items { max-width: 760px; }
+    .tplToggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+    .tplToggle button { height: 32px; padding: 0 14px; border: 0; background: var(--surface); font-size: 13px; color: var(--ink-soft); }
+    .tplToggle button.on { background: var(--cta); color: #fff; }
+    .tplBar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .tplBar .input { width: 260px; }
+    .tplFound { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+    .tplFound .path { color: var(--ink-soft); } .tplFound .path b { color: var(--ink); font-weight: 600; }
+    .tplStats { font-size: 12px; color: var(--ink-faint); }
+    /* 폰 — 앱 step3 (CreateStep3Hero/List.styles 값 근사) */
+    .p3 { font-family: 'Pretendard', system-ui, sans-serif; color: #1B1B1B; background: #fff; display: flex; flex-direction: column; min-height: 100%; }
+    .p3 .items { flex: 1; min-width: 0; background: #fff; padding-bottom: 16px; }
+    .p3 .items.flush { padding-bottom: 0; }
+    .p3 .ch { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #F3F3F3; border-bottom: 1px solid #fff; border-top-right-radius: 20px; }
+    .p3 .ch .ic { width: 32px; height: 32px; border-radius: 16px; background: #414141; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
+    .p3 .ch .ic.lg { font-size: 16px; } .p3 .ch .ic.sm { font-size: 13px; }
+    .p3 .ch .nm { font-size: 16px; font-weight: 600; color: #4E4E4E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p3 .ent { padding-top: 8px; }
+    .p3 .row { min-height: 36px; padding: 5px 16px 5px 10px; display: flex; align-items: center; gap: 6px; }
+    .p3 .cb { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #C6C6C6; flex: 0 0 22px; }
+    .p3 .row .tx { font-size: 16px; font-weight: 500; color: #343434; white-space: pre-line; }
+    .p3 .gw { background: #fff; padding: 6px 0; } .p3 .gw.first { padding-top: 0; }
+    .p3 .gb { margin: 0 8px; border: 1px solid #F6E7D3; border-top-right-radius: 10px; overflow: hidden; }
+    .p3 .gh { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 14px; background: #FEF6EC; cursor: pointer; }
+    .p3 .gh i { width: 3px; height: 12px; border-radius: 2px; background: #C6C6C6; display: block; }
+    .p3 .gh span { flex: 1; font-size: 14px; color: #4E4E4E; letter-spacing: -.5px; }
+    .p3 .gh em { font-style: normal; color: #4E4E4E; font-size: 14px; }
+    .p3 .gi { padding: 7px 0; background: #fff; }
+    .p3 .gi .row { min-height: 32px; padding: 3px 16px 3px 12px; }
+    .p3 .gi .cb { width: 20px; height: 20px; flex-basis: 20px; }
+    .p3 .gi .tx { font-size: 15px; }
+    .p3 .sug { padding: 16px 16px 16px 10px; background: #F3F3F3; }
+    .p3 .sug .h { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 16px; font-weight: 500; color: #636363; line-height: 24px; letter-spacing: -.4px; }
+    .p3 .sug .b { font-size: 12px; color: #636363; line-height: 15.6px; letter-spacing: -.2px; }
+    .p3 .emptyT { padding: 32px; text-align: center; color: #A0A0A0; font-size: 14px; }
+
     /* ── 반응형 ───────────────────────────── */
     @media (max-width: 1100px) {
       .previewCol { width: 100%; flex-basis: auto; position: static; }
@@ -532,7 +586,9 @@ function renderShell() {
     brandMark(),
     el('div', { class: 'menu' },
       el('div', { class: 'sub' }, '콘텐츠'),
-      el('button', { class: 'on', id: 'menuPosts', onClick: () => { closeSide(); showList(); } }, '📝 월별일정 포스트 작성'),
+      el('button', { class: 'on', id: 'menuPosts', onClick: () => { closeSide(); setMenu('menuPosts'); showList(); } }, '📝 월별일정 포스트 작성'),
+      el('div', { class: 'sub' }, '준비물'),
+      el('button', { id: 'menuTemplates', onClick: () => { closeSide(); setMenu('menuTemplates'); showTemplates(); } }, '🎒 준비물 템플릿'),
       el('div', { class: 'sub' }, '시스템'),
       el('button', { id: 'menuSettings', onClick: () => { closeSide(); renderSettings(false); } }, '⚙️ 설정'),
     ),
@@ -551,6 +607,7 @@ function renderShell() {
   $side.addEventListener('click', e => { if (e.target === $side) closeSide(); });
 }
 function closeSide() { $side && $side.classList.remove('open'); }
+function setMenu(id) { if (!$side) return; $side.querySelectorAll('.menu button').forEach(b => b.classList.toggle('on', b.id === id)); }
 function setTop(title, ...actions) { $title.textContent = title; clear($topActions).append(...actions); }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1498,6 +1555,238 @@ function renderEditor(postId, initial) {
     pv.append(el('div', { class: 'cmt' }, '💬 댓글 (앱에서 표시)'));
     clear(screen).append(pv);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8-B. 준비물 템플릿 보기 (2026-10-17) — 읽기 전용
+   원본 = pack_templates (마이그 72). 검증·조립은 앱과 동일:
+   src/stores/templateStore.ts parseRows · src/constants/defaultItems.ts getTemplateForDraft (custom 제외)
+   ═══════════════════════════════════════════════════════════════ */
+const OCCASIONS_DAILY = [
+  { id: 'essential', label: '기본준비물', emoji: '🎒' }, { id: 'food', label: '먹거리/푸드', emoji: '🍱' },
+  { id: 'with_baby', label: '아기와 함께', emoji: '👶' }, { id: 'with_kid', label: '아이와 함께', emoji: '🧒' },
+  { id: 'camping', label: '캠핑', emoji: '⛺' }, { id: 'pool', label: '수영장/워터파크', emoji: '🏊' },
+  { id: 'beach', label: '바다/해수욕장', emoji: '🏖️' }, { id: 'overseas', label: '해외여행', emoji: '✈️' },
+  { id: 'business', label: '출장/업무', emoji: '💼' }, { id: 'hiking', label: '등산/하이킹', emoji: '🏔️' },
+  { id: 'ski', label: '스키/보드', emoji: '⛷️' }, { id: 'running', label: '러닝/달리기', emoji: '🏃' },
+  { id: 'fitness', label: '헬스/운동', emoji: '💪' }, { id: 'cycling', label: '자전거/사이클링', emoji: '🚴' },
+  { id: 'photo', label: '사진/출사', emoji: '📷' }, { id: 'pet', label: '반려동물과 함께', emoji: '🐾' },
+];
+const OCCASIONS_LIFE = [
+  { id: 'wedding', label: '결혼 준비', emoji: '💒' }, { id: 'baby', label: '출산 준비', emoji: '👶' },
+  { id: 'moving', label: '이사 준비', emoji: '📦' }, { id: 'hospital', label: '입원 준비', emoji: '🏥' }, { id: 'funeral', label: '장례 준비', emoji: '🕊️' },
+];
+const OCCASION_ALL = [...OCCASIONS_DAILY, ...OCCASIONS_LIFE];
+const OCCASION_ORDER = Object.fromEntries(OCCASION_ALL.map((o, i) => [o.id, i]));
+const OCCASION_LABEL = Object.fromEntries(OCCASION_ALL.map(o => [o.id, o.label]));
+const OCCASION_EMOJI = Object.fromEntries(OCCASION_ALL.map(o => [o.id, o.emoji]));
+const BASE_EMOJI = { '기본준비물': '🎒', '숙박의류': '👕', '세면도구': '🪥', '구급약품': '💊' };
+const LAYER = { day: ['기본준비물', '구급약품'], overnight: ['기본준비물', '숙박의류', '세면도구', '구급약품'] };
+const TPL_SCHEMA_VERSION = 1;
+const REQUIRED_BASE = ['기본준비물', '숙박의류', '세면도구', '구급약품'];
+const CAT_BADGE_TEXT = { 'D-12개월': '12', 'D-8개월': '8', 'D-3개월': '3', 'D-1개월': '1', '결혼식 후': '1+1' };
+
+async function fetchPackTemplates() {
+  const { data, error } = await sb.from('pack_templates')
+    .select('scope, key, kind, categories, includes, schema_version, sort_order')
+    .eq('is_active', true).order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+/* templateStore.parseRows 이식 */
+function tplParseEntries(v) {
+  if (!Array.isArray(v)) return null;
+  const out = [];
+  for (const e of v) {
+    if (typeof e === 'string') { out.push(e); continue; }
+    if (e && typeof e === 'object' && typeof e.group === 'string' && Array.isArray(e.items) && e.items.every(x => typeof x === 'string')) {
+      out.push({ group: e.group, items: e.items, ...(typeof e.collapsed === 'boolean' ? { collapsed: e.collapsed } : {}) }); continue;
+    }
+    return null;
+  }
+  return out;
+}
+function tplParseCategory(c) {
+  if (!c || typeof c !== 'object' || typeof c.name !== 'string' || !c.name.trim()) return null;
+  const items = tplParseEntries(c.items); if (!items) return null;
+  const cat = { items };
+  if (c.suggestions != null) { const s = tplParseEntries(c.suggestions); if (!s) return null; cat.suggestions = s; }
+  if (typeof c.headline === 'string') cat.headline = c.headline;
+  if (c.period && typeof c.period === 'object' && (c.period.unit === 'M' || c.period.unit === 'D') && typeof c.period.from === 'number' && typeof c.period.to === 'number') cat.period = { unit: c.period.unit, from: c.period.from, to: c.period.to };
+  return { name: c.name, cat };
+}
+function tplParseRows(rows) {
+  const base = {}, occasions = {}, skipped = [];
+  for (const r of rows) {
+    if (r.schema_version !== TPL_SCHEMA_VERSION || !Array.isArray(r.categories)) { skipped.push(r.scope + '/' + r.key); continue; }
+    if (r.scope === 'base') {
+      const first = r.categories.length ? tplParseCategory(r.categories[0]) : null;
+      if (!first) { skipped.push('base/' + r.key); continue; }
+      base[r.key] = first.cat; continue;
+    }
+    if (r.scope === 'occasion') {
+      if (r.kind !== 'daily' && r.kind !== 'life') { skipped.push('occasion/' + r.key); continue; }
+      const categories = {}; let ok = true;
+      for (const c of r.categories) { const p = tplParseCategory(c); if (!p) { ok = false; break; } categories[p.name] = p.cat; }
+      if (!ok) { skipped.push('occasion/' + r.key); continue; }
+      const tpl = { kind: r.kind, categories };
+      if (Array.isArray(r.includes) && r.includes.length) tpl.includes = r.includes.filter(i => i && typeof i.ref === 'string');
+      occasions[r.key] = tpl;
+    }
+  }
+  const missing = REQUIRED_BASE.filter(n => !base[n]);
+  if (missing.length) throw new Error('BASE 템플릿이 없어요: ' + missing.join(', '));
+  if (!Object.keys(occasions).length) throw new Error('오케이전 템플릿 행이 없어요');
+  return { base, occasions, skipped };
+}
+/* defaultItems.getTemplateForDraft 이식 (custom 제외) */
+function tplAssemble(T, selectedIds, overnight) {
+  const result = [], seen = new Set();
+  const push = (name, source, cat, collapsed) => {
+    if (!cat || seen.has(name)) return; seen.add(name);
+    result.push({ name, source, items: cat.items || [], suggestions: cat.suggestions || [], collapsed: !!collapsed, period: cat.period, headline: cat.headline });
+  };
+  const hasDaily = selectedIds.some(id => T.occasions[id]?.kind === 'daily');
+  (hasDaily ? (overnight ? LAYER.overnight : LAYER.day) : []).forEach(n => push(n, 'base', T.base[n]));
+  const ordered = [...selectedIds].sort((a, b) => (OCCASION_ORDER[a] ?? 999) - (OCCASION_ORDER[b] ?? 999));
+  for (const id of ordered) {
+    const tpl = T.occasions[id]; if (!tpl) continue;
+    for (const [name, cat] of Object.entries(tpl.categories)) push(name, id, cat);
+    for (const inc of tpl.includes || []) {
+      if (T.base[inc.ref]) push(inc.as || inc.ref, 'base', T.base[inc.ref], inc.collapsed ?? true);
+      else { const ref = T.occasions[inc.ref]; if (!ref) continue; for (const [name, cat] of Object.entries(ref.categories)) push(inc.as ? inc.as + ' · ' + name : name, inc.ref, cat, inc.collapsed ?? true); }
+    }
+  }
+  return result;
+}
+function tplFlatten(entries) { const out = []; for (const e of entries) typeof e === 'string' ? out.push(e) : out.push(...e.items); return out; }
+function hiText(text, q) {
+  if (!q) return [text];
+  const i = text.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return [text];
+  return [text.slice(0, i), el('mark', {}, text.slice(i, i + q.length)), text.slice(i + q.length)];
+}
+
+async function showTemplates() {
+  state.view = 'templates';
+  setTop('준비물 템플릿', el('span', { class: 'caption' }, '보기 전용 · 원본 = pack_templates (수정은 시드 SQL)'));
+  clear($main).append(el('div', { class: 'empty' }, el('span', { class: 'spin' }), ' 템플릿 불러오는 중…'));
+  let T;
+  try { T = tplParseRows(await withTimeout(fetchPackTemplates(), DB_TIMEOUT_MS, '템플릿 불러오기')); }
+  catch (e) { clear($main).append(el('div', { class: 'empty' }, '템플릿을 불러오지 못했어요: ' + (e?.message || e))); return; }
+  if (T.skipped.length) toast('형식이 달라 건너뛴 행: ' + T.skipped.join(', '), true);
+
+  // 2026-10-17 문지영: 3단계와 같은 2열 — 왼쪽 레일 = BASE 4 · 일상 16 · 인생 5, 오른쪽 = 선택한 것의 카테고리 전부 세로 이어 붙임
+  const S = { sel: { type: 'occ', id: 'essential' }, layer: 'off', q: '', folded: new Set() };
+  const search = el('input', { class: 'input', placeholder: '항목 검색 (예: 텐트, 수영복)' });
+  const layerBox = el('div', { class: 'tplToggle' });
+  const stats = el('span', { class: 'tplStats' });
+  const found = el('div', { class: 'tplFound hidden' });
+  const rail = el('div', { class: 'tvRail' });
+  const main = el('div', { class: 'tvMain' });
+  search.addEventListener('input', debounce(() => { S.q = search.value.trim(); renderMain(); renderFound(); }, 200));
+  clear($main).append(
+    el('div', { class: 'tplBar' }, search, layerBox, stats),
+    found,
+    el('div', { class: 'tvCols' }, rail, main));
+
+  const kindOf = id => T.occasions[id]?.kind;
+  const isSel = (type, key) => S.sel.type === type && (type === 'base' ? S.sel.key === key : S.sel.id === key);
+  const matches = t => !S.q || t.toLowerCase().includes(S.q.toLowerCase());
+  const catCount = cat => tplFlatten(cat.items).length;
+
+  function occCount(id) { const t = T.occasions[id]; return t ? Object.values(t.categories).reduce((n, c) => n + catCount(c), 0) : 0; }
+  function buildRail() {
+    clear(rail);
+    const sec = t => el('div', { class: 'tvSec' }, t);
+    const row = (label, emoji, type, key, count, missing) => el('div', {
+      class: 'tvRow' + (isSel(type, key) ? ' on' : '') + (missing ? ' miss' : ''),
+      title: missing ? 'DB에 템플릿 행 없음' : '',
+      onClick: () => { S.sel = type === 'base' ? { type, key } : { type, id: key }; S.folded = new Set(); buildRail(); buildLayer(); renderMain(); },
+    }, el('span', { class: 'em' }, emoji), el('span', { class: 'lb' }, label), el('span', { class: 'ct' }, missing ? '⚠' : String(count)));
+    rail.append(sec('BASE 레이어'));
+    REQUIRED_BASE.forEach(n => rail.append(row(n, BASE_EMOJI[n], 'base', n, catCount(T.base[n]), false)));
+    rail.append(sec('일상'));
+    OCCASIONS_DAILY.forEach(o => rail.append(row(o.label, o.emoji, 'occ', o.id, occCount(o.id), !T.occasions[o.id])));
+    rail.append(sec('인생 준비물'));
+    OCCASIONS_LIFE.forEach(o => rail.append(row(o.label, o.emoji, 'occ', o.id, occCount(o.id), !T.occasions[o.id])));
+  }
+  function buildLayer() {
+    clear(layerBox);
+    const daily = S.sel.type === 'occ' && kindOf(S.sel.id) === 'daily';
+    layerBox.classList.toggle('hidden', !daily);
+    if (!daily) return;
+    [['off', '고유 카테고리만'], ['day', '레이어 포함 · 당일'], ['overnight', '레이어 포함 · 숙박']].forEach(([v, l]) =>
+      layerBox.append(el('button', { class: S.layer === v ? 'on' : '', onClick: () => { S.layer = v; S.folded = new Set(); renderMain(); } }, l)));
+  }
+  // 오른쪽에 그릴 카테고리 목록
+  function currentCats() {
+    if (S.sel.type === 'base') return [{ name: S.sel.key, source: 'base', ...T.base[S.sel.key], items: T.base[S.sel.key].items, suggestions: T.base[S.sel.key].suggestions || [] }];
+    const id = S.sel.id, tpl = T.occasions[id];
+    if (!tpl) return [];
+    if (kindOf(id) === 'daily' && S.layer !== 'off') return tplAssemble(T, [id], S.layer === 'overnight');
+    // 고유 카테고리 + includes (레이어 없이) — getTemplateForDraft 2)단계와 동일
+    const out = [], seen = new Set();
+    const push = (name, source, cat, collapsed) => { if (!cat || seen.has(name)) return; seen.add(name); out.push({ name, source, items: cat.items || [], suggestions: cat.suggestions || [], collapsed: !!collapsed, headline: cat.headline, period: cat.period }); };
+    Object.entries(tpl.categories).forEach(([n, c]) => push(n, id, c));
+    (tpl.includes || []).forEach(inc => {
+      if (T.base[inc.ref]) push(inc.as || inc.ref, 'base', T.base[inc.ref], inc.collapsed ?? true);
+      else { const ref = T.occasions[inc.ref]; if (ref) Object.entries(ref.categories).forEach(([n, c]) => push(inc.as ? inc.as + ' · ' + n : n, inc.ref, c, inc.collapsed ?? true)); }
+    });
+    return out;
+  }
+  function renderMain() {
+    const cats = currentCats();
+    const total = cats.reduce((n, c) => n + tplFlatten(c.items).length, 0);
+    const title = S.sel.type === 'base' ? S.sel.key : (OCCASION_LABEL[S.sel.id] || S.sel.id);
+    stats.textContent = title + ' · 카테고리 ' + cats.length + ' · 항목 ' + total + '개';
+    clear(main);
+    if (!cats.length) { main.append(el('div', { class: 'p3 emptyT' }, 'DB에 이 오케이전의 템플릿 행이 없어요')); return; }
+    cats.forEach((c, ci) => {
+      const flat = tplFlatten(c.items);
+      const hasHit = !S.q || flat.some(matches) || tplFlatten(c.suggestions).some(matches) || matches(c.name);
+      const block = el('div', { class: 'p3 tvCat' + (S.q && !hasHit ? ' dim' : '') });
+      const badge = CAT_BADGE_TEXT[c.name];
+      const icon = badge ? el('div', { class: 'ic' + (/^\d+$/.test(badge) ? ' lg' : ' sm') }, badge)
+        : el('div', { class: 'ic' }, c.source === 'base' ? (BASE_EMOJI[c.name] || '📁') : (OCCASION_EMOJI[c.source] || '📁'));
+      block.append(el('div', { class: 'ch' }, icon, el('div', { class: 'nm' }, c.headline || c.name),
+        c.headline ? el('span', { class: 'chSub' }, c.name) : null,
+        el('span', { class: 'chSrc' }, c.source === 'base' ? 'BASE' : (OCCASION_LABEL[c.source] || c.source)),
+        c.collapsed ? el('span', { class: 'chSub' }, '(앱에선 접힘)') : null,
+        el('span', { class: 'chCnt' }, flat.length + '개')));
+      const items = el('div', { class: 'items' + (c.suggestions.length ? ' flush' : '') });
+      const ent = el('div', { class: 'ent' });
+      c.items.forEach((e, ei) => {
+        if (typeof e === 'string') return ent.append(el('div', { class: 'row' }, el('span', { class: 'cb' }), el('span', { class: 'tx' }, ...hiText(e, S.q))));
+        const key = ci + ':' + ei;
+        const folded = S.folded.has(key);
+        const gh = el('div', { class: 'gh', onClick: () => { S.folded.has(key) ? S.folded.delete(key) : S.folded.add(key); renderMain(); } },
+          el('i'), el('span', {}, ...hiText(e.group, S.q), el('span', { class: 'gCnt' }, ' ' + e.items.length)), el('em', {}, folded ? '›' : '⌄'));
+        const gi = folded ? null : el('div', { class: 'gi' }, ...e.items.map(it => el('div', { class: 'row' }, el('span', { class: 'cb' }), el('span', { class: 'tx' }, ...hiText(it, S.q)))));
+        ent.append(el('div', { class: 'gw' + (ei === 0 ? ' first' : '') }, el('div', { class: 'gb' }, gh, gi)));
+      });
+      if (!c.items.length) ent.append(el('div', { class: 'caption', style: { padding: '8px 10px' } }, '항목 없음 (레이어만 켜는 오케이전)'));
+      items.append(ent);
+      if (c.suggestions.length) items.append(el('div', { class: 'sug' }, el('div', { class: 'h' }, '📎 이것도 챙기셨나요?'), el('div', { class: 'b' }, ...joinHi(tplFlatten(c.suggestions)))));
+      block.append(items);
+      main.append(block);
+    });
+  }
+  function joinHi(arr) { const out = []; arr.forEach((t, i) => { if (i) out.push(', '); out.push(...hiText(t.replace(/\n/g, ' '), S.q)); }); return out; }
+  function renderFound() {
+    clear(found); found.classList.toggle('hidden', !S.q);
+    if (!S.q) return;
+    const hits = [];
+    const scan = (src, cats) => Object.entries(cats).forEach(([name, cat]) => {
+      cat.items.forEach(e => { if (typeof e === 'string') { if (matches(e)) hits.push({ src, name, g: null, item: e }); } else e.items.forEach(it => { if (matches(it)) hits.push({ src, name, g: e.group, item: it }); }); });
+      (cat.suggestions || []).forEach(e => { if (typeof e === 'string') { if (matches(e)) hits.push({ src, name, g: '추천', item: e }); } else e.items.forEach(it => { if (matches(it)) hits.push({ src, name, g: e.group + '(추천)', item: it }); }); });
+    });
+    Object.entries(T.base).forEach(([n, cat]) => scan('BASE', { [n]: cat }));
+    Object.entries(T.occasions).forEach(([id, tpl]) => scan(OCCASION_LABEL[id] || id, tpl.categories));
+    found.append(el('b', {}, '전체 템플릿에서 "' + S.q + '" ' + hits.length + '건'));
+    hits.slice(0, 60).forEach(h => found.append(el('div', { class: 'path' }, h.src + ' › ' + h.name + (h.g ? ' › ' + h.g : '') + ' › ', el('b', {}, h.item.replace(/\n/g, ' ')))));
+    if (hits.length > 60) found.append(el('div', { class: 'caption' }, '… 외 ' + (hits.length - 60) + '건'));
+  }
+  buildRail(); buildLayer(); renderMain();
 }
 
 /* ═══════════════════════════════════════════════════════════════
