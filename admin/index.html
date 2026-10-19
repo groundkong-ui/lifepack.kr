@@ -305,6 +305,27 @@
     .p3 .sug .b { font-size: 12px; color: #636363; line-height: 15.6px; letter-spacing: -.2px; }
     .p3 .emptyT { padding: 32px; text-align: center; color: #A0A0A0; font-size: 14px; }
 
+    /* ── 공지사항 미리보기 (app/notice.tsx · NoticeScreen.styles · plc.card 값, 2026-10-20) ── */
+    .nv { font-family: 'Pretendard', system-ui, sans-serif; background: #fff; min-height: 100%; }
+    .nv .hdr { height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 16px; font-size: 20px; font-weight: 500; color: #1B1B1B; }
+    .nv .card { padding: 16px 16px 12px; border-bottom: 1px solid #E2E2E2; display: flex; flex-direction: column; gap: 4px; }
+    .nv .card.crit { border-left: 3px solid #E74C3C; }
+    .nv .top { display: flex; align-items: flex-start; gap: 10px; }
+    .nv .ttl { font-size: 17px; font-weight: 600; color: #343434; line-height: 22.1px; letter-spacing: -.4px; }
+    .nv .dt { font-size: 11px; color: #A0A0A0; letter-spacing: .2px; margin-top: 4px; }
+    .nv .chev { align-self: center; color: #A0A0A0; font-size: 14px; }
+    .nv .line { margin-top: 8px; border-top: 1px solid #E2E2E2; }
+    .nv .img { margin: 8px -16px 0; width: calc(100% + 32px); aspect-ratio: 16/9; object-fit: cover; border-radius: 20px 20px 0 0; background: #F3F3F3; display: block; }
+    .nv .body { padding-top: 8px; }
+    .nv .body p { margin: 0; font-size: 17px; line-height: 25px; color: #4A4A4A; letter-spacing: -.2px; word-break: keep-all; }
+    .nv .body .gap { height: 16px; }
+    .nv .body h2 { margin: 14px 0 6px; font-size: 19px; line-height: 24px; color: #4A4A4A; letter-spacing: -.6px; font-weight: 700; }
+    .nv .body b { font-weight: 600; } .nv .body u { font-weight: 500; }
+    .nv .body mark { color: #1F1B16; font-weight: 500; padding: 0; }
+    .nv .body mark.y { background: #FEF8DB; } .nv .body mark.b { background: #E5F1F8; } .nv .body mark.r { background: #FFEEEB; } .nv .body mark.g { background: #ECF6E5; }
+    .nv .empty { padding: 60px 24px; text-align: center; color: #A0A0A0; font-size: 14px; }
+    .imgPrev { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--low); display: block; }
+
     /* ── 반응형 ───────────────────────────── */
     @media (max-width: 1100px) {
       .previewCol { width: 100%; flex-basis: auto; position: static; }
@@ -587,6 +608,7 @@ function renderShell() {
     el('div', { class: 'menu' },
       el('div', { class: 'sub' }, '콘텐츠'),
       el('button', { class: 'on', id: 'menuPosts', onClick: () => { closeSide(); setMenu('menuPosts'); showList(); } }, '📝 월별일정 포스트 작성'),
+      el('button', { id: 'menuNotices', onClick: () => { closeSide(); setMenu('menuNotices'); showNotices(); } }, '📢 공지사항'),
       el('div', { class: 'sub' }, '준비물'),
       el('button', { id: 'menuTemplates', onClick: () => { closeSide(); setMenu('menuTemplates'); showTemplates(); } }, '🎒 준비물 템플릿'),
       el('div', { class: 'sub' }, '시스템'),
@@ -816,20 +838,25 @@ async function buildPayload(input, userId) {
     suggested_items: Object.keys(suggested).length ? suggested : null,
   };
 }
-async function createPost(input, userId) {
+// 2026-10-20 초안/발행 — publish=false면 published_at NULL(초안, 사용자에겐 안 보임). 앱 폼은 즉시 발행(DEFAULT NOW()) 그대로.
+async function createPost(input, userId, publish) {
   const v = validate(input); if (v) return { error: v };
   try {
     const payload = await buildPayload(input, userId);
+    payload.published_at = publish ? new Date().toISOString() : null;
     const { data, error } = await sb.from('posts').insert(payload).select('id').single();
     if (error) return { error: error.message };
     if (!data?.id) return { error: '글 ID를 받지 못했어요' };
     return { data: { id: data.id } };
   } catch (e) { return { error: e?.message || '저장 중 오류가 발생했어요' }; }
 }
-async function updatePost(id, input, userId) {
+// pubMode: 'keep'(발행 상태 유지) | 'draft'(초안 유지) | 'publish'(초안 → 발행: 문지영 10-20 결정 — 작성일도 발행 시각으로)
+async function updatePost(id, input, userId, pubMode) {
   const v = validate(input); if (v) return { error: v };
   try {
     const payload = await buildPayload(input, userId);
+    if (pubMode === 'publish') { const now = new Date().toISOString(); payload.published_at = now; payload.created_at = now; }
+    else if (pubMode === 'draft') payload.published_at = null;
     const { error } = await sb.from('posts').update(payload).eq('id', id).is('deleted_at', null);
     if (error) return { error: error.message };
     return {};
@@ -971,6 +998,7 @@ async function openEditor(postId) {
       subtitle: data.subtitle || '', tags: data.tags || [], subsection_title: data.subsection_title || '',
       location_group_title: data.location_group_title || '', attraction_group_title: data.attraction_group_title || '',
       images: data.images || [], packlist: suggested.packlist, created_at: data.created_at, updated_at: data.updated_at,
+      published_at: data.published_at ?? null,   // 2026-10-20 초안/발행 (마이그 55: NULL = 초안, staff만 봄)
     };
   }
   renderEditor(postId, initial);
@@ -995,13 +1023,25 @@ function renderEditor(postId, initial) {
   };
   const draftKey = 'lp_admin_draft_' + (postId || 'new');
 
-  // ── 상단바 ──
-  const saveBtn = el('button', { class: 'btn primary sm pill', onClick: handleSave }, mode === 'create' ? '발행' : '저장');
+  // ── 상단바 — 2026-10-20 초안 저장 / 발행 (문지영: 토글 대신 버튼 2개로 구분) ──
+  const isPublished = mode === 'edit' && !!initial?.published_at;
+  const draftBtn = el('button', { class: 'btn sm pill', onClick: () => handleSave(isPublished ? 'keep' : 'draft') }, isPublished ? '저장' : '초안 저장');
+  const pubBtn = isPublished
+    ? el('button', { class: 'btn sm ghost danger', onClick: handleUnpublish }, '발행 취소')
+    : el('button', { class: 'btn primary sm pill', onClick: () => handleSave('publish') }, '발행');
+  const saveBtn = { set disabled(v) { draftBtn.disabled = v; pubBtn.disabled = v; }, set textContent(t) { /* 버튼 2개라 미사용 */ } };
   const backBtn = el('button', { class: 'btn sm ghost', onClick: async () => {
     if (S.dirty && !(await confirmDialog('저장하지 않은 변경이 있어요. 나갈까요?\n(임시저장은 이 브라우저에 남아 있어요)', { confirmLabel: '나가기' }))) return;
     detach(); showList();
   } }, '← 목록');
-  setTop(mode === 'create' ? '새 글 작성' : '글 수정', backBtn, saveBtn);
+  setTop((mode === 'create' ? '새 글 작성' : '글 수정') + (mode === 'edit' ? (isPublished ? ' · 발행됨' : ' · 초안') : ''), backBtn, draftBtn, pubBtn);
+
+  async function handleUnpublish() {
+    if (!(await confirmDialog('이 글을 초안으로 되돌릴까요?\n사용자 화면에서 바로 사라집니다.', { title: '발행 취소', confirmLabel: '발행 취소', danger: true }))) return;
+    const { error } = await sb.from('posts').update({ published_at: null }).eq('id', postId).is('deleted_at', null);
+    if (error) return toast(error.message, true);
+    S.dirty = false; detach(); toast('초안으로 되돌렸어요'); await openEditor(postId);
+  }
 
   // ── 레이아웃 ──
   const form = el('div', { class: 'form' });
@@ -1167,7 +1207,7 @@ function renderEditor(postId, initial) {
     if (e.key === 'b') { e.preventDefault(); wrapSel('**', '굵게 할 텍스트를 먼저 선택하세요'); }
     if (e.key === 'u') { e.preventDefault(); wrapSel('__', '밑줄 칠 텍스트를 먼저 선택하세요'); }
   });
-  document.addEventListener('keydown', function ctrlS(e) { if ((e.ctrlKey || e.metaKey) && e.key === 's' && state.view === 'editor') { e.preventDefault(); handleSave(); } if (state.view !== 'editor') document.removeEventListener('keydown', ctrlS); });
+  document.addEventListener('keydown', function ctrlS(e) { if ((e.ctrlKey || e.metaKey) && e.key === 's' && state.view === 'editor') { e.preventDefault(); handleSave(isPublished ? 'keep' : 'draft'); } if (state.view !== 'editor') document.removeEventListener('keydown', ctrlS); });
 
   // ── 준비물리스트 ──
   const packTitleIn = textInput('packTitle', { placeholder: '리스트 제목 예: 어버이날 준비물리스트', maxLength: 50 });
@@ -1262,11 +1302,11 @@ function renderEditor(postId, initial) {
   }
 
   // ── 저장 (PostForm.handleSave 이식) ──
-  async function handleSave() {
+  async function handleSave(pubMode) {
     if (S.saving) return;
     if (!state.user) return toast('로그인이 필요해요', true);
     if (!S.title.trim()) return toast('제목을 입력해주세요', true);
-    S.saving = true; saveBtn.disabled = true; saveBtn.textContent = '저장 중…';
+    S.saving = true; saveBtn.disabled = true;
     const tags = S.tagsText.split(',').map(t => t.trim()).filter(Boolean).filter((t, i, a) => a.indexOf(t) === i).slice(0, 8).map(t => t.slice(0, 20));
     const images = S.imageList.map(i => ({
       url: i.originalUrl, credit: resolveCredit(i), source_type: i.sourceType, photographer: i.photographer.trim() || null,
@@ -1287,17 +1327,18 @@ function renderEditor(postId, initial) {
     const cleanupImages = () => { if (toDelete.length) deletePostImages(toDelete).catch(() => {}); };
     const triggerSnapshot = () => { const ids = S.tourapiItems.map(i => i.contentId).filter(Boolean); if (ids.length) refreshLocations(ids).catch(() => {}); };
     try {
+      const doneMsg = pubMode === 'publish' ? '글이 발행되었어요' : pubMode === 'draft' ? '초안으로 저장했어요 (사용자에겐 안 보여요)' : '저장되었어요';
       if (mode === 'create') {
-        const r = await withTimeout(createPost(input, state.user.id), DB_TIMEOUT_MS, '저장');
+        const r = await withTimeout(createPost(input, state.user.id, pubMode === 'publish'), DB_TIMEOUT_MS, '저장');
         if (r.error) await alertDialog(r.error, '저장 실패');
-        else { cleanupImages(); triggerSnapshot(); S.dirty = false; localStorage.removeItem(draftKey); detach(); toast('글이 발행되었어요'); await openEditor(r.data.id); return; }
+        else { cleanupImages(); triggerSnapshot(); S.dirty = false; localStorage.removeItem(draftKey); detach(); toast(doneMsg); await openEditor(r.data.id); return; }
       } else {
-        const r = await withTimeout(updatePost(postId, input, state.user.id), DB_TIMEOUT_MS, '저장');
+        const r = await withTimeout(updatePost(postId, input, state.user.id, pubMode), DB_TIMEOUT_MS, '저장');
         if (r.error) await alertDialog(r.error, '저장 실패');
-        else { cleanupImages(); triggerSnapshot(); S.dirty = false; S.pendingDeletes = []; localStorage.removeItem(draftKey); toast('저장되었어요'); detach(); await openEditor(postId); return; }
+        else { cleanupImages(); triggerSnapshot(); S.dirty = false; S.pendingDeletes = []; localStorage.removeItem(draftKey); toast(doneMsg); detach(); await openEditor(postId); return; }
       }
     } catch (e) { await alertDialog((e?.message || '저장 중 오류가 발생했어요') + '\n\n입력한 내용은 그대로 남아 있어요. 네트워크를 확인하고 다시 저장해주세요.', '저장 실패'); }
-    finally { S.saving = false; saveBtn.disabled = !S.title.trim(); saveBtn.textContent = mode === 'create' ? '발행' : '저장'; }
+    finally { S.saving = false; saveBtn.disabled = !S.title.trim(); }
   }
 
   /* ── 사진 검색 모달 (PhotoSearchSheet 이식) ── */
@@ -1787,6 +1828,245 @@ async function showTemplates() {
     if (hits.length > 60) found.append(el('div', { class: 'caption' }, '… 외 ' + (hits.length - 60) + '건'));
   }
   buildRail(); buildLayer(); renderMain();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8-C. 공지사항 (2026-10-20) — src/api/admin-notices.ts 이식
+   · 마이그 10·49(staff CRUD)·50(image_url, 버킷 announcements) · 64(Storage SELECT staff)
+   · 초안 저장 / 발행 버튼 2개 (문지영: 토글 대신). 발행된 글 = 저장 / 발행 취소
+   · 삭제 = 완전 삭제 + Storage 파일 삭제 (앱과 동일, 휴지통 없음)
+   · is_critical 입력 칸 없음 (앱 관리자 폼과 동일, 항상 false)
+   ═══════════════════════════════════════════════════════════════ */
+const NOTICE_BUCKET = 'announcements';
+
+async function fetchAllNotices() {
+  const { data, error } = await sb.from('announcements').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+async function createNotice(input, publish) {
+  const { data, error } = await sb.from('announcements').insert({
+    title: input.title, content: input.content, image_url: input.image_url ?? null, is_critical: input.is_critical ?? false,
+    published_at: publish ? new Date().toISOString() : null,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+async function updateNotice(id, input) {
+  const { error } = await sb.from('announcements').update({
+    title: input.title, content: input.content, image_url: input.image_url ?? null, is_critical: input.is_critical ?? false,
+  }).eq('id', id);
+  if (error) throw error;
+}
+async function setNoticePublished(id, publish) {
+  const { error } = await sb.from('announcements').update({ published_at: publish ? new Date().toISOString() : null }).eq('id', id);
+  if (error) throw error;
+}
+async function deleteNotice(notice) {
+  if (notice.image_url) {
+    const filename = notice.image_url.split('/').pop();
+    if (filename) await sb.storage.from(NOTICE_BUCKET).remove([filename]);
+  }
+  const { error } = await sb.from('announcements').delete().eq('id', notice.id);
+  if (error) throw error;
+}
+// 앱 = 갤러리 JPEG 품질 0.85·크기 조절 없음. PC 원본은 버킷 상한 5MB를 넘을 수 있어 가로 1600 이하 JPEG 0.85로 변환 (유일한 차이)
+async function uploadNoticeImage(file) {
+  const bmp = await fileToBitmap(file);
+  const srcW = bmp.width || bmp.naturalWidth, srcH = bmp.height || bmp.naturalHeight;
+  const w = Math.min(1600, srcW), h = Math.round(srcH * w / srcW);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(bmp, 0, 0, w, h);
+  const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('이미지 변환에 실패했어요')), 'image/jpeg', 0.85));
+  const filename = Date.now() + '.jpg';
+  const { error } = await sb.storage.from(NOTICE_BUCKET).upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw error;
+  return sb.storage.from(NOTICE_BUCKET).getPublicUrl(filename).data.publicUrl;
+}
+
+/* 본문 마크업 툴바 — 포스트 폼과 같은 마커 (## · ** · __ · =y= =b= =r= =g=) */
+function markupToolbar(ta, onChange) {
+  const wrapSel = (mark, msg) => {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    if (s === e) return toast(msg, true);
+    const v = ta.value; ta.value = v.slice(0, s) + mark + v.slice(s, e) + mark + v.slice(e);
+    ta.setSelectionRange(s, e + mark.length * 2); ta.focus(); onChange(ta.value);
+  };
+  const applyH2 = () => {
+    const v = ta.value, s = ta.selectionStart, ls = v.lastIndexOf('\n', s - 1) + 1;
+    ta.value = v.startsWith('## ', ls) ? v.slice(0, ls) + v.slice(ls + 3) : v.slice(0, ls) + '## ' + v.slice(ls);
+    ta.focus(); onChange(ta.value);
+  };
+  const hl = (color, mark) => el('button', { class: 'mdBtn hl', title: '형광펜', onClick: () => wrapSel(mark, '형광펜을 칠할 텍스트를 먼저 선택하세요') }, el('i', { style: { background: color } }));
+  ta.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === 'b') { e.preventDefault(); wrapSel('**', '굵게 할 텍스트를 먼저 선택하세요'); }
+    if (e.key === 'u') { e.preventDefault(); wrapSel('__', '밑줄 칠 텍스트를 먼저 선택하세요'); }
+  });
+  return el('div', { class: 'mdToolbar' },
+    el('button', { class: 'mdBtn', onClick: applyH2 }, 'H2 소제목'),
+    el('button', { class: 'mdBtn', style: { fontWeight: 700 }, onClick: () => wrapSel('**', '굵게 할 텍스트를 먼저 선택하세요') }, 'B'),
+    el('button', { class: 'mdBtn', style: { textDecoration: 'underline' }, onClick: () => wrapSel('__', '밑줄 칠 텍스트를 먼저 선택하세요') }, 'U'),
+    hl('#FED23E', '=y='), hl('#60A4CE', '=b='), hl('#FF9A89', '=r='), hl('#8DC970', '=g='),
+    el('span', { class: 'caption', style: { alignSelf: 'center' } }, 'Ctrl+B 굵게 · Ctrl+U 밑줄'));
+}
+/* 본문 마크업 렌더 (app/post/[id].tsx renderInline·ContentBlock와 동일 규칙) — 공지·포스트 미리보기 공용 */
+function renderMarkupInline(line) {
+  const re = /\*\*(.+?)\*\*|__(.+?)__|=([ybrg])=(.+?)=\3=|==(.+?)==/g;
+  const nodes = []; let last = 0, mt;
+  while ((mt = re.exec(line)) !== null) {
+    if (mt.index > last) nodes.push(line.slice(last, mt.index));
+    if (mt[1] !== undefined) nodes.push(el('b', {}, mt[1]));
+    else if (mt[2] !== undefined) nodes.push(el('u', {}, mt[2]));
+    else if (mt[4] !== undefined) nodes.push(el('mark', { class: mt[3] }, mt[4]));
+    else nodes.push(el('mark', { class: 'b' }, mt[5]));
+    last = mt.index + mt[0].length;
+  }
+  if (last < line.length) nodes.push(line.slice(last));
+  return nodes;
+}
+function renderMarkupBlock(text, cls) {
+  const lines = (text || '').replace(/\r/g, '').split('\n');
+  const box = el('div', { class: cls });
+  lines.forEach((line, idx) => {
+    if (line.startsWith('## ')) return box.append(el('h2', {}, ...renderMarkupInline(line.slice(3))));
+    if (line.trim() === '') { if (idx > 0 && lines[idx - 1].startsWith('## ')) return; return box.append(el('div', { class: 'gap' })); }
+    box.append(el('p', {}, ...renderMarkupInline(line)));
+  });
+  return box;
+}
+function fmtNoticeDate(iso) { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0'); }
+
+async function showNotices() {
+  state.view = 'notices';
+  setTop('공지사항', el('button', { class: 'btn primary sm pill', onClick: () => openNoticeEditor(null) }, '＋ 새 공지'));
+  clear($main).append(el('div', { class: 'empty' }, el('span', { class: 'spin' }), ' 불러오는 중…'));
+  let rows;
+  try { rows = await withTimeout(fetchAllNotices(), DB_TIMEOUT_MS, '공지 목록'); }
+  catch (e) { clear($main).append(el('div', { class: 'empty' }, '공지를 불러오지 못했어요: ' + (e?.message || e))); return; }
+  const table = el('table', { class: 'list' });
+  table.append(el('thead', {}, el('tr', {}, ...['', '제목', '상태', '날짜', ''].map(h => el('th', {}, h)))));
+  const tb = el('tbody');
+  rows.forEach(n => tb.append(el('tr', { class: 'rowBtn', onClick: e => { if (e.target.closest('button')) return; openNoticeEditor(n); } },
+    el('td', {}, n.image_url ? el('img', { class: 'thumb', src: n.image_url, alt: '', loading: 'lazy', style: { objectFit: 'cover' } }) : el('span', { class: 'thumb' })),
+    el('td', { class: 'tdTitle' }, n.title, n.is_critical ? el('span', { class: 'tag', style: { marginLeft: '6px', background: '#FFEEEB', color: '#E74C3C' } }, '중요') : null),
+    el('td', {}, el('span', { class: 'tag', style: n.published_at ? { background: '#E8F1F8', color: '#2A6DB1' } : null }, n.published_at ? '발행됨' : '초안')),
+    el('td', { class: 'small muted' }, fmtNoticeDate(n.published_at || n.created_at)),
+    el('td', {}, el('div', { class: 'row' },
+      el('button', { class: 'btn sm', onClick: () => openNoticeEditor(n) }, '수정'),
+      el('button', { class: 'btn sm danger', onClick: async () => {
+        if (!(await confirmDialog('[' + n.title + '] 공지를 삭제할까요?\n완전히 삭제되고 되돌릴 수 없어요.', { title: '공지 삭제', confirmLabel: '삭제', danger: true }))) return;
+        try { await withTimeout(deleteNotice(n), DB_TIMEOUT_MS, '삭제'); toast('삭제했어요'); showNotices(); }
+        catch (e) { toast(e?.message || '삭제에 실패했어요', true); }
+      } }, '삭제'))))));
+  table.append(tb);
+  clear($main).append(el('div', { class: 'toolbar' }, el('span', { class: 'caption' }, rows.length + '건 · 초안은 사용자에게 보이지 않아요')), table);
+  if (!rows.length) $main.append(el('div', { class: 'empty' }, '아직 공지가 없어요'));   // append(null)은 "null" 글자가 찍힘
+}
+
+function openNoticeEditor(notice) {
+  state.view = 'noticeEditor';
+  const isEdit = !!notice;
+  const isPublished = isEdit && !!notice.published_at;
+  const S = { title: notice?.title || '', content: notice?.content || '', imageUrl: notice?.image_url || null, pendingFile: null, pendingPreview: null, saving: false, dirty: false };
+
+  const form = el('div', { class: 'form' });
+  const screen = el('div', { class: 'screen' });
+  const previewCol = el('div', { class: 'previewCol' });
+  const wrap = el('div', { class: 'editorWrap', dataset: { view: 'edit' } });
+  const tabs = el('div', { class: 'viewTabs' },
+    el('button', { class: 'btn sm primary', onClick: e => { wrap.dataset.view = 'edit'; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('primary', b === e.currentTarget)); } }, '편집'),
+    el('button', { class: 'btn sm', onClick: e => { wrap.dataset.view = 'preview'; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('primary', b === e.currentTarget)); renderPreview(); } }, '미리보기'));
+  const collapseBtn = el('button', { class: 'btn sm ghost', onClick: () => { previewCol.classList.toggle('collapsed'); collapseBtn.textContent = previewCol.classList.contains('collapsed') ? '▶' : '접기 ◀'; } }, '접기 ◀');
+  previewCol.append(el('div', { class: 'previewHead' }, el('span', {}, '앱 공지사항 미리보기 (375)'), collapseBtn), el('div', { class: 'phone' }, screen));
+  wrap.append(form, previewCol);
+  clear($main).append(tabs, wrap);
+
+  const canSave = () => !S.saving && S.title.trim() && S.content.trim();
+  const draftBtn = el('button', { class: 'btn sm pill', onClick: () => handleSave(isPublished ? 'keep' : 'draft') }, isPublished ? '저장' : '초안 저장');
+  const pubBtn = isPublished
+    ? el('button', { class: 'btn sm ghost danger', onClick: handleUnpublish }, '발행 취소')
+    : el('button', { class: 'btn primary sm pill', onClick: () => handleSave('publish') }, '발행');
+  const backBtn = el('button', { class: 'btn sm ghost', onClick: async () => {
+    if (S.dirty && !(await confirmDialog('저장하지 않은 변경이 있어요. 나갈까요?', { confirmLabel: '나가기' }))) return;
+    detach(); showNotices();
+  } }, '← 목록');
+  setTop((isEdit ? '공지 수정' : '공지 작성') + (isEdit ? (isPublished ? ' · 발행됨' : ' · 초안') : ''), backBtn, draftBtn, pubBtn);
+  function syncBtns() { draftBtn.disabled = !canSave(); pubBtn.disabled = isPublished ? S.saving : !canSave(); }
+  function beforeUnload(e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } }
+  window.addEventListener('beforeunload', beforeUnload);
+  function detach() { window.removeEventListener('beforeunload', beforeUnload); }
+  const schedulePreview = debounce(renderPreview, 250);
+  const markDirty = () => { S.dirty = true; syncBtns(); schedulePreview(); };
+
+  const titleIn = el('input', { class: 'input', placeholder: '공지 제목', value: S.title });
+  titleIn.addEventListener('input', () => { S.title = titleIn.value; markDirty(); });
+  const bodyIn = el('textarea', { class: 'input body', placeholder: '공지 내용을 입력하세요 (## 소제목 · **굵게** · __밑줄__ · =y=형광펜=y=)' }); bodyIn.value = S.content;
+  bodyIn.addEventListener('input', () => { S.content = bodyIn.value; markDirty(); });
+  const toolbar = markupToolbar(bodyIn, v => { S.content = v; markDirty(); });
+
+  const imgBox = el('div', { class: 'field' });
+  const fileIn = el('input', { type: 'file', accept: 'image/*', class: 'hidden', onChange: () => { const f = fileIn.files[0]; fileIn.value = ''; if (!f) return; if (S.pendingPreview) URL.revokeObjectURL(S.pendingPreview); S.pendingFile = f; S.pendingPreview = URL.createObjectURL(f); buildImage(); markDirty(); } });
+  function buildImage() {
+    clear(imgBox);
+    const src = S.pendingPreview || S.imageUrl;
+    if (src) imgBox.append(el('img', { class: 'imgPrev', src, alt: '' }),
+      el('div', { class: 'row' },
+        el('button', { class: 'btn sm', onClick: () => fileIn.click() }, '다른 사진'),
+        el('button', { class: 'btn sm danger', onClick: () => { if (S.pendingPreview) URL.revokeObjectURL(S.pendingPreview); S.pendingFile = null; S.pendingPreview = null; S.imageUrl = null; buildImage(); markDirty(); } }, '이미지 제거'),
+        S.pendingFile ? el('span', { class: 'caption' }, '저장할 때 업로드돼요 (JPEG · 가로 1600 이하)') : null));
+    else imgBox.append(el('button', { class: 'btn', style: { width: '100%' }, onClick: () => fileIn.click() }, '🖼 이미지 선택 (선택 · 1장)'));
+    imgBox.append(fileIn);
+  }
+  buildImage();
+
+  form.append(
+    el('div', { class: 'field' }, el('span', { class: 'label' }, '제목 *'), titleIn),
+    el('div', { class: 'field' }, el('span', { class: 'label' }, '내용 *'), toolbar, bodyIn),
+    el('div', { class: 'field' }, el('span', { class: 'label' }, '이미지 (선택)'), el('span', { class: 'helper' }, '앱에선 제목 아래 16:9로 가로 꽉 차게 보여요'), imgBox),
+    el('div', { class: 'caption' }, isEdit ? '작성 ' + fmtNoticeDate(notice.created_at) + (notice.published_at ? ' · 발행 ' + fmtNoticeDate(notice.published_at) : ' · 초안') : '초안 저장 = 사용자에게 안 보임 · 발행 = 공지 화면에 바로 노출'),
+    el('div', { style: { height: '40px' } }));
+  syncBtns();
+  renderPreview();
+
+  function renderPreview() {
+    if (!screen.isConnected) return;
+    const nv = el('div', { class: 'nv' });
+    nv.append(el('div', { class: 'hdr' }, '‹ 공지사항'));
+    if (!S.title.trim() && !S.content.trim()) { nv.append(el('div', { class: 'empty' }, '제목과 내용을 입력하면 여기에 보여요')); clear(screen).append(nv); return; }
+    const src = S.pendingPreview || S.imageUrl;
+    const card = el('div', { class: 'card' + (notice?.is_critical ? ' crit' : '') },
+      el('div', { class: 'top' }, el('div', { style: { flex: 1 } }, el('div', { class: 'ttl' }, S.title || '제목'), el('div', { class: 'dt' }, fmtNoticeDate(notice?.published_at || notice?.created_at || new Date().toISOString()) + (isPublished ? '' : ' · 초안'))), el('span', { class: 'chev' }, '⌃')),
+      src ? el('img', { class: 'img', src, alt: '' }) : el('div', { class: 'line' }),
+      renderMarkupBlock(S.content, 'body'));
+    nv.append(card);
+    clear(screen).append(nv);
+  }
+
+  async function handleSave(pubMode) {
+    if (!canSave()) return toast('제목과 내용을 입력해주세요', true);
+    S.saving = true; syncBtns();
+    try {
+      let imageUrl = S.imageUrl;
+      if (S.pendingFile) imageUrl = await withTimeout(uploadNoticeImage(S.pendingFile), 30000, '이미지 업로드');
+      const input = { title: S.title.trim(), content: S.content.trim(), image_url: imageUrl };
+      if (isEdit) {
+        await withTimeout(updateNotice(notice.id, input), DB_TIMEOUT_MS, '저장');
+        if (pubMode === 'publish' && !notice.published_at) await withTimeout(setNoticePublished(notice.id, true), DB_TIMEOUT_MS, '발행');
+      } else {
+        await withTimeout(createNotice(input, pubMode === 'publish'), DB_TIMEOUT_MS, '저장');
+      }
+      S.dirty = false; detach();
+      toast(pubMode === 'publish' ? '공지가 발행되었어요' : pubMode === 'draft' ? '초안으로 저장했어요 (사용자에겐 안 보여요)' : '저장되었어요');
+      showNotices();
+    } catch (e) { await alertDialog((e?.message || '저장에 실패했어요') + '\n\n입력한 내용은 그대로 남아 있어요.', '저장 실패'); }
+    finally { S.saving = false; syncBtns(); }
+  }
+  async function handleUnpublish() {
+    if (!(await confirmDialog('이 공지를 초안으로 되돌릴까요?\n사용자 화면에서 바로 사라집니다.', { title: '발행 취소', confirmLabel: '발행 취소', danger: true }))) return;
+    try { await withTimeout(setNoticePublished(notice.id, false), DB_TIMEOUT_MS, '발행 취소'); S.dirty = false; detach(); toast('초안으로 되돌렸어요'); showNotices(); }
+    catch (e) { toast(e?.message || '실패했어요', true); }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
