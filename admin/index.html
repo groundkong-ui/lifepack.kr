@@ -263,7 +263,10 @@
     .tvMain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
     .tvCat { border-bottom: 10px solid #F3F3F3; }
     .tvCat.dim { opacity: .35; }
-    .tvCat { display: block; min-height: 0; }           /* p3의 flex·min-height 100% 해제 — 헤더가 첫 항목을 가리던 문제 */
+    .p3.tvCat { display: block; min-height: 0; }        /* 2026-10-22 버그: .p3(min-height 100%)가 이겨 카테고리마다 화면 높이로 늘어나 2번째부터 잘림 → 복합 선택자로 우선순위 올림 */
+    .tvSub { height: 36px; padding: 0 10px 0 44px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #fff; font-size: 13px; color: #636363; cursor: pointer; background: #EBEBEB; }
+    .tvSub.on { background: #fff; color: #1B1B1B; font-weight: 600; }
+    .tvSub .lb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .tvSub .ct { font-size: 11px; color: #A0A0A0; }
     .tvCat .ch { border-top-right-radius: 0; }
     .tvCat .chSub { font-size: 12px; color: #727272; margin-left: 4px; }
     .tvCat .chSrc { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff; border: 1px solid #E2E2E2; color: #636363; margin-left: 6px; }
@@ -1717,7 +1720,7 @@ async function showTemplates() {
   if (T.skipped.length) toast('형식이 달라 건너뛴 행: ' + T.skipped.join(', '), true);
 
   // 2026-10-17 문지영: 3단계와 같은 2열 — 왼쪽 레일 = BASE 4 · 일상 16 · 인생 5, 오른쪽 = 선택한 것의 카테고리 전부 세로 이어 붙임
-  const S = { sel: { type: 'occ', id: 'essential' }, layer: 'off', q: '', folded: new Set() };
+  const S = { sel: { type: 'occ', id: 'essential' }, layer: 'off', q: '', folded: new Set(), activeCat: 0 };
   const search = el('input', { class: 'input', placeholder: '항목 검색 (예: 텐트, 수영복)' });
   const layerBox = el('div', { class: 'tplToggle' });
   const stats = el('span', { class: 'tplStats' });
@@ -1738,19 +1741,45 @@ async function showTemplates() {
   function occCount(id) { const t = T.occasions[id]; return t ? Object.values(t.categories).reduce((n, c) => n + catCount(c), 0) : 0; }
   function buildRail() {
     clear(rail);
+    let selEl = null;
     const sec = t => el('div', { class: 'tvSec' }, t);
-    const row = (label, emoji, type, key, count, missing) => el('div', {
-      class: 'tvRow' + (isSel(type, key) ? ' on' : '') + (missing ? ' miss' : ''),
-      title: missing ? 'DB에 템플릿 행 없음' : '',
-      onClick: () => { S.sel = type === 'base' ? { type, key } : { type, id: key }; S.folded = new Set(); buildRail(); buildLayer(); renderMain(); },
-    }, el('span', { class: 'em' }, emoji), el('span', { class: 'lb' }, label), el('span', { class: 'ct' }, missing ? '⚠' : String(count)));
+    const row = (label, emoji, type, key, count, missing) => {
+      const r = el('div', {
+        class: 'tvRow' + (isSel(type, key) ? ' on' : '') + (missing ? ' miss' : ''),
+        title: missing ? 'DB에 템플릿 행 없음' : '',
+        onClick: () => { S.sel = type === 'base' ? { type, key } : { type, id: key }; S.folded = new Set(); S.activeCat = 0; buildLayer(); renderMain(); window.scrollTo({ top: 0 }); },
+      }, el('span', { class: 'em' }, emoji), el('span', { class: 'lb' }, label), el('span', { class: 'ct' }, missing ? '⚠' : String(count)));
+      if (isSel(type, key)) selEl = r;
+      return r;
+    };
     rail.append(sec('BASE 레이어'));
     REQUIRED_BASE.forEach(n => rail.append(row(n, BASE_EMOJI[n], 'base', n, catCount(T.base[n]), false)));
     rail.append(sec('일상'));
     OCCASIONS_DAILY.forEach(o => rail.append(row(o.label, o.emoji, 'occ', o.id, occCount(o.id), !T.occasions[o.id])));
     rail.append(sec('인생 준비물'));
     OCCASIONS_LIFE.forEach(o => rail.append(row(o.label, o.emoji, 'occ', o.id, occCount(o.id), !T.occasions[o.id])));
+    // 2026-10-22 문지영: 선택한 오케이전 아래 카테고리 서브메뉴 (앱 3단계 왼쪽 열 이름: D-12개월·D-8개월 …) — 클릭 = 해당 위치로 이동
+    if (selEl) {
+      const cats = currentCats();
+      if (cats.length > 1) selEl.after(...cats.map((c, i) => el('div', { class: 'tvSub' + (i === S.activeCat ? ' on' : ''), onClick: () => jumpTo(i) },
+        el('span', { class: 'lb' }, c.name), el('span', { class: 'ct' }, String(tplFlatten(c.items).length)))));
+    }
   }
+  function jumpTo(i) {
+    const block = document.getElementById('tvcat-' + i); if (!block) return;
+    S.activeCat = i; setActiveSub();
+    window.scrollTo({ top: block.getBoundingClientRect().top + window.scrollY - 60, behavior: 'smooth' });
+  }
+  function setActiveSub() { rail.querySelectorAll('.tvSub').forEach((s, i) => s.classList.toggle('on', i === S.activeCat)); }
+  // 스크롤 위치 → 보고 있는 카테고리 강조 (상단바 52 아래 기준)
+  const onScroll = debounce(() => {
+    if (state.view !== 'templates' || !rail.isConnected) return;
+    const blocks = [...main.querySelectorAll('.tvCat')]; if (!blocks.length) return;
+    let idx = 0;
+    blocks.forEach((b, i) => { if (b.getBoundingClientRect().top <= 120) idx = i; });
+    if (idx !== S.activeCat) { S.activeCat = idx; setActiveSub(); }
+  }, 80);
+  window.addEventListener('scroll', onScroll, { passive: true });
   function buildLayer() {
     clear(layerBox);
     const daily = S.sel.type === 'occ' && kindOf(S.sel.id) === 'daily';
@@ -1785,7 +1814,7 @@ async function showTemplates() {
     cats.forEach((c, ci) => {
       const flat = tplFlatten(c.items);
       const hasHit = !S.q || flat.some(matches) || tplFlatten(c.suggestions).some(matches) || matches(c.name);
-      const block = el('div', { class: 'p3 tvCat' + (S.q && !hasHit ? ' dim' : '') });
+      const block = el('div', { class: 'p3 tvCat' + (S.q && !hasHit ? ' dim' : ''), id: 'tvcat-' + ci });
       const badge = CAT_BADGE_TEXT[c.name];
       const icon = badge ? el('div', { class: 'ic' + (/^\d+$/.test(badge) ? ' lg' : ' sm') }, badge)
         : el('div', { class: 'ic' }, c.source === 'base' ? (BASE_EMOJI[c.name] || '📁') : (OCCASION_EMOJI[c.source] || '📁'));
@@ -1811,6 +1840,7 @@ async function showTemplates() {
       block.append(items);
       main.append(block);
     });
+    buildRail();   // 서브메뉴 = 현재 카테고리 목록과 동기화 (레이어 토글·선택 변경 반영)
   }
   function joinHi(arr) { const out = []; arr.forEach((t, i) => { if (i) out.push(', '); out.push(...hiText(t.replace(/\n/g, ' '), S.q)); }); return out; }
   function renderFound() {
